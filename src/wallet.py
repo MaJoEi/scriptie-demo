@@ -1,2 +1,9 @@
+import rsa
+import crypto
+
+
 class Wallet:
-    pass
+    crypto = crypto.Crypto()
+    crypto.generateKeys()
+    publicKey, privateKey = crypto.load_keys()
+

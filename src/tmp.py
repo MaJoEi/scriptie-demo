@@ -2,6 +2,7 @@ import requests
 import json
 import wallet
 import verifier
+import rsa
 
 auth_url = "https://wallet.walt.id/api/auth/login"
 userinfo_url = "https://wallet.walt.id/api/auth/userInfo"
