@@ -3,6 +3,6 @@ import crypto
 
 
 class Verifier:
-    crypto = crypto.Crypto()
+    crypto = crypto
     crypto.generateKeys()
     publicKey, privateKey = crypto.loadKeys()
