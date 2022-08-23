@@ -1,5 +1,6 @@
 import requests
 import json
+import ssi_util
 import wallet
 import verifier
 import rsa
@@ -35,3 +36,4 @@ didcreate_body = {
 didresp = requests.post(didcreate_url, json=didcreate_body)
 print(didresp.text)
 
+str = ssi_util.create_did()
