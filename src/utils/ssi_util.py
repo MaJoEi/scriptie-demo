@@ -20,3 +20,11 @@ def create_did():
     }
     didresp = requests.post(didcreate_url, json=didcreate_body)
     return didresp.text
+
+
+# Resolves a DID to its corresponding DID document
+def resolve_did(did):
+    didresolve_url = "https://custodian.ssikit.walt-test.cloud/did/resolve"
+    didresolve_body = {"did": did}
+    resp = requests.post(didresolve_url, json=didresolve_body)
+    return resp
