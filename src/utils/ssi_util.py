@@ -33,42 +33,42 @@ def resolve_did(did):
 # Creates a mock authorization certificate in the form of a verifiable credential
 def create_auth_cert(issuer_did, subject_did, context_id, description):
     schema = {
-            "@context": [
-                "https://www.w3.org/2018/credentials/v1",
-                "https://www.overidentification-protection-authority.gov/2022/authorizations/v1"
-            ],
+        "@context": [
+            "https://www.w3.org/2018/credentials/v1",
+            "https://www.overidentification-protection-authority.gov/2022/authorizations/v1"
+        ],
 
-            "id": issuer_did,
+        "id": issuer_did,
 
-            "type": ["VerifiableCredential", "AuthorizationCredential"],
+        "type": ["VerifiableCredential", "AuthorizationCredential"],
 
-            "issuer": "https://overidentification-protection-authority.gov/issuers/42042",
+        "issuer": "https://overidentification-protection-authority.gov/issuers/42042",
 
-            "issuanceDate": "2022-07-06T14:23:24Z",
+        "issuanceDate": "2022-07-06T14:23:24Z",
 
-            "credentialSubject": {
+        "credentialSubject": {
 
-                "id": subject_did,
+            "id": subject_did,
 
-                "context": {
-                    "contextID": context_id,
-                    "decisionModel": f"https://overidentification-protection-authority.gov/context-models/{context_id}",
-                    "description": description
-                }
-            },
-
-            "proof": {
-
-                "type": "RsaSignature2018",
-
-                "created": "2017-06-18T21:19:10Z",
-
-                "proofPurpose": "assertionMethod",
-
-                "verificationMethod": "https://example.edu/issuers/565049#key-1",
-
-                "jws": "eyJhbGciOiJSUzI1NiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19..TCYt5XsITJX1CxPCT8yAV - TVkIEq_PbChOMqsLfRoPsnsgw5WEuts01mq - pQy7UJiN5mgRxD - WUcX16dUEMGlv50aqzpqh4Qktb3rk - BuQy72IFLOqV0G_zS245 - kronKb78cPN25DGlcTwLtjPAYuNzVBAh4vGHSrQyHUdBBPM"
+            "context": {
+                "contextID": context_id,
+                "decisionModel": f"https://overidentification-protection-authority.gov/context-models/{context_id}",
+                "description": description
             }
+        },
+
+        "proof": {
+
+            "type": "RsaSignature2018",
+
+            "created": "2017-06-18T21:19:10Z",
+
+            "proofPurpose": "assertionMethod",
+
+            "verificationMethod": "https://example.edu/issuers/565049#key-1",
+
+            "jws": "eyJhbGciOiJSUzI1NiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19..TCYt5XsITJX1CxPCT8yAV - TVkIEq_PbChOMqsLfRoPsnsgw5WEuts01mq - pQy7UJiN5mgRxD - WUcX16dUEMGlv50aqzpqh4Qktb3rk - BuQy72IFLOqV0G_zS245 - kronKb78cPN25DGlcTwLtjPAYuNzVBAh4vGHSrQyHUdBBPM"
+        }
     }
     auth_cert = json.dumps(schema)
     print(auth_cert)
