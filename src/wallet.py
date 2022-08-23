@@ -1,6 +1,4 @@
-import requests
-import rsa_crypto
-import ssi_util
+from utils import rsa_crypto
 
 
 class Wallet:

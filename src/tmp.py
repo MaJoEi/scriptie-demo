@@ -1,9 +1,6 @@
 import requests
 import json
-import ssi_util
-import wallet
-import verifier
-import rsa
+from utils import ssi_util
 
 auth_url = "https://wallet.walt.id/api/auth/login"
 userinfo_url = "https://wallet.walt.id/api/auth/userInfo"
