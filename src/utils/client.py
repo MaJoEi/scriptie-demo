@@ -1,13 +1,18 @@
 import socket
+import threading
+import time
 
 
-class Client(object):
+class Client(threading.Thread):
     s = socket.socket()
     host = socket.gethostname()
 
+    def __init__(self, threadID):
+        threading.Thread.__init__(self)
+        self.threadID = threadID
+
     def establish_connection(self, port):
-        self.s.bind((self.host, port))
-        self.s.connect((self.host, self.port))
+        self.s.connect((self.host, port))
 
     def send(self, message):
         self.s.send(message.encode())
@@ -18,6 +23,6 @@ class Client(object):
         return data
 
     def interrupt_connection(self):
-        message = "Interrupt"
+        message = "interrupt"
         self.s.send(message.encode())
-        self.s.close()
+        #self.s.close()

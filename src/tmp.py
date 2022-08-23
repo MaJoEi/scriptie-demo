@@ -1,6 +1,9 @@
 import requests
 import json
-from utils import ssi_util
+import threading
+from utils import ssi_util, server, client
+from utils.client import Client
+from utils.server import Server
 
 auth_url = "https://wallet.walt.id/api/auth/login"
 userinfo_url = "https://wallet.walt.id/api/auth/userInfo"
@@ -32,4 +35,11 @@ didcreate_body = {
 
 didresp = requests.post(didcreate_url, json=didcreate_body)
 print(didresp.text)
+
+
+# test_client = Client(1)
+# test_server = Server(13374, 2)
+# test_client.start()
+# test_server.start()
+
 

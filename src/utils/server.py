@@ -1,13 +1,16 @@
 import socket
+import threading
 
 
-class Server(object):
+class Server(threading.Thread):
     s = socket.socket()
     host = socket.gethostname()
     conn = None
 
-    def __init__(self, port):
+    def __init__(self, port, threadID):
+        threading.Thread.__init__(self)
         self.port = port
+        self.threadID = threadID
         self.s.bind((self.host, port))
 
     def establish_connection(self):
@@ -27,3 +30,4 @@ class Server(object):
 
     def interrupt_connection(self):
         self.conn.close()
+        print("Interrupted")
