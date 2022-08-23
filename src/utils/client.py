@@ -5,14 +5,19 @@ class Client(object):
     s = socket.socket()
     host = socket.gethostname()
 
-    def __init__(self, port):
-        self.port = port
+    def establish_connection(self, port):
         self.s.bind((self.host, port))
+        self.s.connect((self.host, self.port))
 
-    def send(self, conn, endpoint, message):
-
+    def send(self, message):
+        self.s.send(message.encode())
         return
 
     def receive(self):
+        data = self.s.recv(1024).decode()
+        return data
 
-        return
+    def interrupt_connection(self):
+        message = "Interrupt"
+        self.s.send(message.encode())
+        self.s.close()
