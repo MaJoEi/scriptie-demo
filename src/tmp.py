@@ -7,12 +7,12 @@ userinfo_url = "https://wallet.walt.id/api/auth/userInfo"
 didcreate_url = "https://custodian.ssikit.walt-test.cloud/did/create"
 
 auth = {
-  "id": "string",
-  "email": "string",
-  "password": "string",
-  "token": "string",
-  "ethAccount": "string",
-  "did": "string"
+    "id": "string",
+    "email": "string",
+    "password": "string",
+    "token": "string",
+    "ethAccount": "string",
+    "did": "string"
 }
 
 response = requests.post(auth_url, json=auth)
@@ -33,4 +33,3 @@ didcreate_body = {
 didresp = requests.post(didcreate_url, json=didcreate_body)
 print(didresp.text)
 
-str = ssi_util.create_did()
