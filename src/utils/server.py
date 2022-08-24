@@ -1,4 +1,4 @@
-import socket
+import socket, pickle
 import threading
 
 
@@ -18,11 +18,12 @@ class Server(threading.Thread):
         self.conn, address = self.s.accept()
 
     def send(self, message):
-        self.conn.send(message.encode())
-        return
+        # self.conn.send(message.encode())
+        self.conn.send(message)
 
     def receive(self):
-        data = self.conn.recv(1024).decode()
+        # data = self.conn.recv(1024).decode()
+        data = self.conn.recv(1024)
         if data == "interrupt":
             self.interrupt_connection()
         else:
@@ -31,3 +32,4 @@ class Server(threading.Thread):
     def interrupt_connection(self):
         self.conn.close()
         print("Interrupted")
+        return 0

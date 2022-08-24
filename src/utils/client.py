@@ -1,6 +1,6 @@
 import socket
+import pickle
 import threading
-import time
 
 
 class Client(threading.Thread):
@@ -15,11 +15,12 @@ class Client(threading.Thread):
         self.s.connect((self.host, port))
 
     def send(self, message):
-        self.s.send(message.encode())
-        return
+        # self.s.send(message.encode())
+        self.s.send(message)
 
     def receive(self):
-        data = self.s.recv(1024).decode()
+        # data = self.s.recv(1024).decode()
+        data = self.s.recv(1024)
         return data
 
     def interrupt_connection(self):

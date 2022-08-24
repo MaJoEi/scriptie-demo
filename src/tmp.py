@@ -1,6 +1,11 @@
+import os
+
 import requests
 import json
 import threading
+
+import rsa
+
 from utils import ssi_util, server, client, rsa_crypto
 from utils.client import Client
 from utils.server import Server
@@ -38,11 +43,15 @@ didcreate_body = {
 didresp = requests.post(didcreate_url, json=didcreate_body)
 print(didresp.text)"""
 
-wallet = Wallet(1)
+test_wallet = Wallet(1)
+test_verifier = Verifier(13374, 2)
+
+test_verifier.start()
+test_wallet.start()
+
+
 
 # test_client = Client(1)
 # test_server = Server(13374, 2)
 # test_client.start()
 # test_server.start()
-
-
