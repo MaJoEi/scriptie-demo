@@ -1,19 +1,30 @@
+import os
 import rsa
 
 
 def generateKeys():
+    dir = os.path.dirname(__file__)
     (publicKey, __privateKey) = rsa.newkeys(1024)
-    with open('../keys/publicKey.pem', 'wb') as p:
+    print(publicKey)
+    print(__privateKey)
+    filename = os.path.join(dir, 'keys', 'publicKey.pem')
+    with open(filename, 'wb') as p:
         p.write(publicKey.save_pkcs1('PEM'))
-    with open('../keys/privateKey.pem', 'wb') as p:
+    filename = os.path.join(dir, 'keys', 'privateKey.pem')
+    with open(filename, 'wb') as p:
         p.write(__privateKey.save_pkcs1('PEM'))
 
 
 def loadKeys():
-    with open('../keys/publicKey.pem', 'rb') as p:
+    dir = os.path.dirname(__file__)
+    filename = os.path.join(dir, 'keys', 'publicKey.pem')
+    with open(filename, 'rb') as p:
         publicKey = rsa.PublicKey.load_pkcs1(p.read())
-    with open('../keys/privateKey.pem', 'rb') as p:
+    filename = os.path.join(dir, 'keys', 'privateKey.pem')
+    with open(filename, 'rb') as p:
         __privateKey = rsa.PrivateKey.load_pkcs1(p.read())
+    print(publicKey)
+    print(__privateKey)
     return __privateKey, publicKey
 
 

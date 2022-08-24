@@ -1,22 +1,66 @@
 import json
 import jsondiff
 import requests
+import rsa
+import os
+
+from utils import rsa_crypto
+
+"""This file contains basic SSI utility functions, such as the creation and resolving of DIDs.
+For functions involving DIDs and VCs (whenever not mocked), we utilize REST APIs from walt.id's SSI Kit (primarily the 
+Custodian API)"""
 
 
-# Creates a DID via the Custodian API of the walt.id SSI Kit
-def create_did():
-    # Create a key on which the DID will be built
+# Creates a keypair with an alias via the walt.id Custodian API
+def create_and_export_keypair():
+    # Creation of the key pair
     keygen_url = "https://custodian.ssikit.walt-test.cloud/keys/generate"
     keygen_body = {"keyAlgorithm": "RSA"}
     keygen_resp = requests.post(keygen_url, json=keygen_body)
     resp = json.loads(keygen_resp.text)
-    keyalias = resp['keyId']['id']
+    key_id = resp['keyId']['id']
 
-    # Creation of the DID
+    # Obtaining the public key
+    keyexport_url = "https://custodian.ssikit.walt-test.cloud/keys/export"
+    body = {
+        "keyAlias": "93956bf3dc6c46478d01f7ca48b41347",
+        "format": "PEM",
+        "exportPrivate": False
+    }
+    resp = requests.post(keyexport_url, json=body).text
+    publicKey = rsa.PublicKey.load_pkcs1_openssl_pem(resp)
+
+    # Obtaining the private key
+    body = {
+        "keyAlias": "93956bf3dc6c46478d01f7ca48b41347",
+        "format": "PEM",
+        "exportPrivate": True
+    }
+    resp = requests.post(keyexport_url, json=body).text
+    # print(resp[28:897])
+    # resp = resp[:11] + "RSA " + resp[11:907] + "RSA " + resp[907:]
+    # dir = os.path.dirname(__file__)
+    # filename = os.path.join(dir, 'keys', 'privateKey.pem')
+    # with open(filename, 'wb') as p:
+    #     p.write(bytes(resp.encode()))
+    # with open(filename, 'rb') as p:
+    #     __privateKey = rsa.PrivateKey.load_pkcs1(p.read())
+    #     print(__privateKey)
+    pem_prefix = '-----BEGIN RSA PRIVATE KEY-----\n'
+    pem_suffix = '\n-----END RSA PRIVATE KEY-----'
+    key = '{}{}{}'.format(pem_prefix, resp[28:897], pem_suffix)
+    print(key)
+    __privateKey = rsa.PrivateKey.load_pkcs1(key)
+
+    return key_id, __privateKey, publicKey
+
+
+# Creates a DID via the Custodian API of the walt.id SSI Kit
+def create_did(key_id):
     didcreate_url = "https://custodian.ssikit.walt-test.cloud/did/create"
     didcreate_body = {
         "method": "key",
-        "keyAlias": str(keyalias)
+        "keyAlias": str(key_id)
     }
     didresp = requests.post(didcreate_url, json=didcreate_body)
     return didresp.text

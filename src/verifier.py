@@ -4,9 +4,6 @@ from utils.server import Server
 
 
 class Verifier(Server):
-    # rsa_crypto.generateKeys()
-    # __privateKey, publicKey = rsa_crypto.loadKeys()
-    # public_did = ssi_util.create_did()
 
     def __init__(self, port, threadID):
         threading.Thread.__init__(self)
@@ -16,4 +13,5 @@ class Verifier(Server):
 
     # Mocked session establishment where wallet and verifier share identifiers and cryptographic keys
     def session_establishment(self):
+        self.session_establishment()
         pass

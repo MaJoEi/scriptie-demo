@@ -1,13 +1,13 @@
 import requests
 import json
 import threading
-from utils import ssi_util, server, client
+from utils import ssi_util, server, client, rsa_crypto
 from utils.client import Client
 from utils.server import Server
 from verifier import Verifier
 from wallet import Wallet
 
-auth_url = "https://wallet.walt.id/api/auth/login"
+"""auth_url = "https://wallet.walt.id/api/auth/login"
 userinfo_url = "https://wallet.walt.id/api/auth/userInfo"
 didcreate_url = "https://custodian.ssikit.walt-test.cloud/did/create"
 
@@ -36,7 +36,9 @@ didcreate_body = {
 }
 
 didresp = requests.post(didcreate_url, json=didcreate_body)
-print(didresp.text)
+print(didresp.text)"""
+
+wallet = Wallet(1)
 
 # test_client = Client(1)
 # test_server = Server(13374, 2)
