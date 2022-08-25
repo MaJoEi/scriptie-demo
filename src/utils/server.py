@@ -1,5 +1,6 @@
 import socket, pickle
 import threading
+from utils import rsa_crypto2
 
 
 class Server(threading.Thread):
@@ -23,7 +24,7 @@ class Server(threading.Thread):
 
     def receive(self):
         # data = self.conn.recv(1024).decode()
-        data = self.conn.recv(8192)
+        data = self.conn.recv(10240)
         if data == "interrupt":
             self.interrupt_connection()
         else:

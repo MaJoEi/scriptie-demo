@@ -19,9 +19,9 @@ class Client(threading.Thread):
         self.s.send(message)
 
     def receive(self):
-        # data = self.s.recv(1024).decode()
-        data = self.s.recv(8192)
-        if data == 'interrupt':
+        # data = self.s.recv(8192).decode()
+        data = self.s.recv(10240)
+        if data == "interrupt":
             self.interrupt_connection()
         else:
             return data
@@ -30,3 +30,4 @@ class Client(threading.Thread):
         message = "interrupt"
         self.s.send(message.encode())
         #self.s.close()
+

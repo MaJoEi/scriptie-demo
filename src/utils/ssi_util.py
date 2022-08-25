@@ -68,14 +68,19 @@ def create_did(key_id):
     return didresp.text
 
 
-# Creates random "mocked" DID
-def create_random_did():
-    # Create a key on which the DID will be built, such that this function does not generate the same DID every time
+# Creates a random key from which a did can be created
+def create_random_key():
     keygen_url = "https://custodian.ssikit.walt-test.cloud/keys/generate"
     keygen_body = {"keyAlgorithm": "RSA"}
     keygen_resp = requests.post(keygen_url, json=keygen_body)
     resp = json.loads(keygen_resp.text)
-    keyalias = resp['keyId']['id']
+    return resp['keyId']['id']
+
+
+# Creates random "mocked" DID
+def create_random_did():
+    # Create a key on which the DID will be built, such that this function does not generate the same DID every time
+    keyalias = create_random_key()
 
     # Creation of the DID
     didcreate_url = "https://custodian.ssikit.walt-test.cloud/did/create"
@@ -103,11 +108,11 @@ def create_auth_cert(issuer_did, subject_did, context_id, description):
             "https://www.overidentification-protection-authority.gov/2022/authorizations/v1"
         ],
 
-        "id": issuer_did,
+        "id": "http://overidentification-protection-authority.gov/certificates/1337",
 
         "type": ["VerifiableCredential", "AuthorizationCredential"],
 
-        "issuer": "https://overidentification-protection-authority.gov/issuers/42042",
+        "issuer": issuer_did,
 
         "issuanceDate": "2022-07-06T14:23:24Z",
 
