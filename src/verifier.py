@@ -1,9 +1,11 @@
+import json
 import os
 import pickle
 import threading
 from utils import ssi_util, rsa_crypto
 from utils.server import Server
 from pathlib import Path
+import uuid
 
 
 class Verifier(Server):
@@ -63,5 +65,25 @@ class Verifier(Server):
         packet = self.prepare_encrypted_packet(msg)
         self.send(packet)
 
+    # "Super"-method to model the proposed extended presentation exchange with contextual access permissions
+    def presentation_exchange(self):
+        authorizer_did = ssi_util.create_random_did()
+        description = ""
+        context_id = uuid.uuid4().hex
+        auth_cert = json.loads(ssi_util.create_auth_cert(authorizer_did, self.public_did, context_id, description))
+        self.present_auth_certificate(auth_cert)
+        self.data_request()
+
+    """ Method to model the first part of the presentation exchange, where the verifier presents their authorization 
+    certificate for the context of the transaction to the wallet which in turn computes which attributes the verifier 
+    may request"""
+    def present_auth_certificate(self, auth_cert):
+        pass
+
+    """ Method to model the second part of the presentation exchange, i.e. the "actual" presentation exchange """
+    def data_request(self):
+        pass
+
     def run(self):
         self.mock_session_establishment()
+        self.presentation_exchange()

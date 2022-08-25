@@ -1,4 +1,5 @@
-"""Source: https://gist.github.com/dustindorroh/7488f8016bc360fb1182d037dcee2a27"""
+""" Sources: https://gist.github.com/dustindorroh/7488f8016bc360fb1182d037dcee2a27 for most of the code
+https://cryptobook.nakov.com/digital-signatures/rsa-sign-verify-examples for the signature functions """
 import os
 import zlib
 import base64

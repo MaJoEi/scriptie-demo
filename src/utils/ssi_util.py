@@ -3,6 +3,7 @@ import jsondiff
 import requests
 import rsa
 import os
+import uuid
 
 """This file contains basic SSI utility functions, such as the creation and resolving of DIDs.
 For functions involving DIDs and VCs (whenever not mocked), we utilize REST APIs from walt.id's SSI Kit (primarily the 
@@ -106,7 +107,7 @@ def create_auth_cert(issuer_did, subject_did, context_id, description):
             "https://www.overidentification-protection-authority.gov/2022/authorizations/v1"
         ],
 
-        "id": "http://overidentification-protection-authority.gov/certificates/1337",
+        "id": f"http://overidentification-protection-authority.gov/certificates/{uuid.uuid4().hex}",
 
         "type": ["VerifiableCredential", "AuthorizationCredential"],
 
@@ -139,5 +140,4 @@ def create_auth_cert(issuer_did, subject_did, context_id, description):
         }
     }
     auth_cert = json.dumps(schema)
-    print(auth_cert)
     return auth_cert

@@ -63,5 +63,20 @@ class Wallet(Client):
             return
         self.server_did = pickle.loads(msg)
 
+    # "Super"-method to model the proposed extended presentation exchange with contextual access permissions
+    def presentation_exchange(self):
+        self.determine_access_permissions()
+        self.process_data_request()
+
+    """ Method to model the first part of the presentation exchange, where the verifier presents their authorization 
+        certificate for the context of the transaction to the wallet which in turn computes which attributes the verifier 
+        may request """
+    def determine_access_permissions(self):
+        pass
+
+    """ Method to model the second part of the presentation exchange, i.e. the "actual" presentation exchange """
+    def process_data_request(self):
+        pass
+
     def run(self):
         self.mock_session_establishment(13374)
