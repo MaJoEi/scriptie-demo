@@ -43,13 +43,12 @@ didcreate_body = {
 didresp = requests.post(didcreate_url, json=didcreate_body)
 print(didresp.text)"""
 
-# test_wallet = Wallet(1)
-# test_verifier = Verifier(13374, 2)
-#
-# test_verifier.start()
-# test_wallet.start()
+test_wallet = Wallet(1)
+test_verifier = Verifier(13374, 2)
+test_verifier.start()
+test_wallet.start()
 
-ssi_util.create_and_export_keypair(123)
+# ssi_util.create_and_export_keypair(123)
 
 
 

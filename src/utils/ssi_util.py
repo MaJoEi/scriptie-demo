@@ -28,7 +28,10 @@ Custodian API)"""
         "exportPrivate": False
     }
     resp = requests.post(keyexport_url, json=body).text
-    publicKey = rsa.PublicKey.load_pkcs1_openssl_pem(resp)
+    pem_prefix = '-----BEGIN RSA PRIVATE KEY-----\n'
+    pem_suffix = '\n-----END RSA PRIVATE KEY-----\n'
+    key = '{}{}{}'.format(pem_prefix, resp[28:], pem_suffix)
+    # publicKey = RSA.importKey(resp)
 
     # Obtaining the private key
     body = {
@@ -49,10 +52,7 @@ Custodian API)"""
     pem_prefix = '-----BEGIN RSA PRIVATE KEY-----\n'
     pem_suffix = '\n-----END RSA PRIVATE KEY-----\n'
     key = '{}{}{}'.format(pem_prefix, resp[28:897], pem_suffix)
-    print(key.encode())
-    rsa_crypto.generateKeys()
-    rsa_crypto.loadKeys()
-    __privateKey = rsa.PrivateKey.load_pkcs1(key.encode())
+    __privateKey = RSA.importKey(key)
 
     return key_id, __privateKey, publicKey"""
 
