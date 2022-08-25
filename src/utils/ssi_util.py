@@ -4,8 +4,6 @@ import requests
 import rsa
 import os
 
-from utils import rsa_crypto
-
 """This file contains basic SSI utility functions, such as the creation and resolving of DIDs.
 For functions involving DIDs and VCs (whenever not mocked), we utilize REST APIs from walt.id's SSI Kit (primarily the 
 Custodian API)"""

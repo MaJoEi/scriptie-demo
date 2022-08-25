@@ -6,7 +6,7 @@ import threading
 
 import rsa
 
-from utils import ssi_util, server, client, rsa_crypto
+from utils import ssi_util, server, client
 from utils.client import Client
 from utils.server import Server
 from verifier import Verifier

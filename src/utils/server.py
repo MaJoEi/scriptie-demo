@@ -1,6 +1,6 @@
 import socket, pickle
 import threading
-from utils import rsa_crypto2
+from utils import rsa_crypto
 
 
 class Server(threading.Thread):
