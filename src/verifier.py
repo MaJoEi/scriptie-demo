@@ -25,7 +25,10 @@ class Verifier(Server):
     # Mocked session establishment where wallet and verifier share identifiers and cryptographic keys
     def mock_session_establishment(self):
         self.establish_connection()
-        
+        msg1_raw = pickle.dumps(self.public_key)
+        msg1_signature = rsa_crypto2.sign(msg1_raw, self.__private_key.read_bytes())
+        msg1 = pickle.dumps({msg1_raw, msg1_signature}, 2)
+        self.send(msg1)
 
     def run(self):
         self.mock_session_establishment()

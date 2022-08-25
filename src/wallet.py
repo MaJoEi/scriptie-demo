@@ -8,7 +8,6 @@ from Cryptodome.PublicKey import RSA
 
 
 class Wallet(Client):
-
     directory = os.path.dirname(__file__)
 
     def __init__(self, threadID):
@@ -23,9 +22,15 @@ class Wallet(Client):
 
     """ Mocked session establishment where wallet and verifier share identifiers and cryptographic keys 
     This does not resemble a 'real' session establishment process like the DIDComm or OIDC variants """
+
     def mock_session_establishment(self, port):
         self.establish_connection(port)
-
+        msg1 = self.receive()
+        msg, sign = pickle.loads(msg1)
+        self.server_pub_key = pickle.loads(msg)
+        if not rsa_crypto2.verify(msg, sign, self.server_pub_key.read_bytes()):
+            return
+        # self.server_pub_key = pickle.loads(msg)
 
     def run(self):
         self.mock_session_establishment(13374)
