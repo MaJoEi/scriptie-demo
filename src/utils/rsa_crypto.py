@@ -1,9 +1,12 @@
 import os
 import rsa
 import rsa.randnum
-import Crypto
-# from Crypto.Cipher import AES
+import Cryptodome
+from Cryptodome.Cipher import AES
 import pickle
+from Cryptodome.PublicKey import RSA
+from Cryptodome.Cipher import PKCS1_OAEP
+import binascii
 
 
 def generateKeys():
@@ -32,7 +35,11 @@ def encrypt(message, key):
     return rsa.encrypt(message.encode('ascii'), key)
 
 
-def encrypt_large_message(message, key):
+def encrypt_bytes(message, key):
+    return rsa.encrypt(message, key)
+
+
+"""def encrypt_large_message(message, key):
     aes_key = rsa.randnum.read_random_bits(128)
     nonce, ciphertext, tag = aes_encrypt(message, key)
     encrypted_aes_key = rsa.encrypt(aes_key, key)
@@ -55,7 +62,7 @@ def aes_decrypt(nonce, ciphertext, tag, key):
         return plaintext
     except ValueError:
         print("Key incorrect or message corrupted")
-        return
+        return"""
 
 
 def decrypt(ciphertext, key):
@@ -65,12 +72,31 @@ def decrypt(ciphertext, key):
         return False
 
 
+def decrypt_bytes(ciphertext, key):
+    try:
+        return rsa.decrypt(ciphertext, key)
+    except:
+        return False
+
+
 def sign(message, key):
     return rsa.sign(message.encode('ascii'), key, 'SHA-1')
+
+
+def sign_bytes(message, key):
+    return rsa.sign(message, key, 'SHA-1')
 
 
 def verify(message, signature, key):
     try:
         return rsa.verify(message.encode('ascii'), signature, key, ) == 'SHA-1'
+    except:
+        return False
+
+
+def verify_bytes(message, signature, key):
+    print(rsa.verify(message, signature, key))
+    try:
+        return rsa.verify(message, signature, key) == 'SHA-1'
     except:
         return False
