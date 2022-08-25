@@ -25,12 +25,17 @@ class Wallet(Client):
 
     def mock_session_establishment(self, port):
         self.establish_connection(port)
-        msg1 = self.receive()
-        msg, sign = pickle.loads(msg1)
+        packet = self.receive()
+        msg, sign = pickle.loads(packet)
         self.server_pub_key = pickle.loads(msg)
         if not rsa_crypto2.verify(msg, sign, self.server_pub_key.read_bytes()):
+            self.interrupt_connection()
             return
-        # self.server_pub_key = pickle.loads(msg)
+        msg = pickle.dumps({self.public_key, self.public_did}, 2)
+        sign = rsa_crypto2.sign(msg, self.__private_key.read_bytes())
+        packet = pickle.dumps({msg, sign}, 2)
+        packet = rsa_crypto2.encrypt_blob(packet, self.server_pub_key.read_bytes())
+        self.send(packet)
 
     def run(self):
         self.mock_session_establishment(13374)

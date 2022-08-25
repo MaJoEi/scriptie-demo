@@ -23,7 +23,7 @@ class Server(threading.Thread):
 
     def receive(self):
         # data = self.conn.recv(1024).decode()
-        data = self.conn.recv(1024)
+        data = self.conn.recv(8192)
         if data == "interrupt":
             self.interrupt_connection()
         else:
