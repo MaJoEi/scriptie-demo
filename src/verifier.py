@@ -23,7 +23,7 @@ class Verifier(Server):
         self.public_did = ssi_util.create_random_did()
         self.client_pub_key = None
         self.client_did = None
-        self.previous_nonces = {}
+        self.previous_nonces = set()
 
     # Utility method to sign a message and create an encrypted package containing the message and its signature
     def prepare_encrypted_packet(self, msg):
@@ -48,6 +48,7 @@ class Verifier(Server):
 
     """ Mocked session establishment where wallet and verifier share identifiers and cryptographic keys 
         This does not resemble a 'real' session establishment process like the DIDComm or OIDC variants """
+
     def mock_session_establishment(self):
         self.establish_connection()
         print("Preparing message 0.1")
@@ -66,8 +67,18 @@ class Verifier(Server):
         packet = self.prepare_encrypted_packet(msg)
         self.send(packet)
 
+    """" Method to verify that a nonce has not been re-used """
+
+    def nonce_verification(self, nonce):
+        if nonce in self.previous_nonces:
+            return False
+        else:
+            self.previous_nonces.add(nonce)
+            return True
+
     # "Super"-method to model the proposed extended presentation exchange with contextual access permissions
     def presentation_exchange(self):
+        print("Generating auth certificate")
         authorizer_did = ssi_util.create_random_did()
         description = ""
         context_id = uuid.uuid4().hex
@@ -79,7 +90,25 @@ class Verifier(Server):
     certificate for the context of the transaction to the wallet which in turn computes which attributes the verifier 
     may request """
     def present_auth_certificate(self, auth_cert):
-        pass
+        packet = self.receive()
+        print("Received message 1")
+        packet = rsa_crypto.decrypt_blob(packet, self.__private_key.read_bytes())
+        msg, sign = pickle.loads(packet)
+        if not self.verify_packet(msg, sign):
+            return
+        msg = json.loads(pickle.loads(msg))
+        self.process_auth_request(msg)
+
+    def process_auth_request(self, msg):
+        nonce = msg["nonce"]
+        if not self.nonce_verification(nonce):
+            self.interrupt_connection()
+            return
+        requested_type = msg["presentation_definition"]["input_descriptors"][0]["constraints"]["fields"][0]["filter"][
+            "pattern"]
+        if not requested_type == "VerifierAuthorizationCredential":
+            self.interrupt_connection()
+            return
 
     """ Method to model the second part of the presentation exchange, i.e. the "actual" presentation exchange """
     def data_request(self):

@@ -78,8 +78,9 @@ class Wallet(Client):
         certificate for the context of the transaction to the wallet which in turn computes which attributes the 
         verifier may request. """
     def determine_access_permissions(self):
+        print("Preparing message 1")
         msg = self.request_for_authorization()
-        packet = self.prepare_encrypted_packet(msg)
+        packet = self.prepare_encrypted_packet(pickle.dumps(msg))
         self.send(packet)
 
     """" Generates a message to request the disclosure of a contextual authorization certificate.
@@ -89,8 +90,8 @@ class Wallet(Client):
         nonce = self.generate_nonce()
         msg_body = {
             "response_type": "vp_token",
-            "client_id": "https%3A%2F%2Fclient.example.org%2Fcb",
-            "redirect_uri": "https%3A%2F%2Fclient.example.org%2Fcb",
+            "client_id": "https://client.example.org/",
+            "redirect_uri": "https://client.example.org/",
             "presentation_definition": {
                 "id": "Request for contextual authorization",
                 "input_descriptors": [
@@ -137,3 +138,4 @@ class Wallet(Client):
 
     def run(self):
         self.mock_session_establishment(13374)
+        self.presentation_exchange()
