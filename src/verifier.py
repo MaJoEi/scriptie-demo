@@ -97,18 +97,50 @@ class Verifier(Server):
         if not self.verify_packet(msg, sign):
             return
         msg = json.loads(pickle.loads(msg))
-        self.process_auth_request(msg)
-
-    def process_auth_request(self, msg):
         nonce = msg["nonce"]
+        self.process_auth_request(msg, nonce)
+        print("Preparing message 2")
+        msg = self.prepare_presentation_auth_cert(nonce)
+        packet = self.prepare_encrypted_packet(pickle.dumps(msg))
+        self.send(packet)
+
+    """" Generates a message to disclose a contextual authorization certificate.
+         This message is modeled after the authentication response message of the OpenID for Verifiable Presentations 
+         standard (https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-response) """
+    def prepare_presentation_auth_cert(self, nonce, auth_cert):
+        msg_body = {
+            "client_id": "https://client.example.org/post",
+            "redirect_uris": ["https://client.example.org/post"],
+            "response_types": "vp_token",
+            "response_mode": "post",
+            "presentation_submission": {
+                "id": "Verifier Authorization Credential example presentation",
+                "definition_id": "Verifier Authorization Credential example",
+                "descriptor_map": [
+                    {
+                        "id": "Verifier Authorization Credential",
+                        "format": "ldp_vc",
+                        "path": "$"
+                    }
+                ]
+            },
+            "vp_token": auth_cert,
+            "nonce": nonce
+        }
+        return json.dumps(msg_body)
+
+    """" Mocks the processing of the request for contextual authorization by only checking for nonce re-usage and 
+    verifying that it is indeed asking for a VerifierAuthorizationCredential. Other fields are ignored. In a real 
+    application, all fields would need to be processed """
+    def process_auth_request(self, msg, nonce):
         if not self.nonce_verification(nonce):
             self.interrupt_connection()
-            return
+            return False
         requested_type = msg["presentation_definition"]["input_descriptors"][0]["constraints"]["fields"][0]["filter"][
             "pattern"]
         if not requested_type == "VerifierAuthorizationCredential":
             self.interrupt_connection()
-            return
+            return False
 
     """ Method to model the second part of the presentation exchange, i.e. the "actual" presentation exchange """
     def data_request(self):

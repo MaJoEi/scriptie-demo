@@ -23,7 +23,7 @@ class Wallet(Client):
         self.public_did = ssi_util.create_random_did()
         self.server_pub_key = None
         self.server_did = None
-        self.previous_nonces = {}
+        self.previous_nonces = set()
 
     # Utility method to sign a message and create an encrypted package containing the message and its signature
     def prepare_encrypted_packet(self, msg):
@@ -79,14 +79,14 @@ class Wallet(Client):
         verifier may request. """
     def determine_access_permissions(self):
         print("Preparing message 1")
-        msg = self.request_for_authorization()
+        msg = self.prepare_request_for_authorization()
         packet = self.prepare_encrypted_packet(pickle.dumps(msg))
         self.send(packet)
 
     """" Generates a message to request the disclosure of a contextual authorization certificate.
      This message is modeled after the authentication request message of the OpenID for Verifiable Presentations 
      standard (https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-request) """
-    def request_for_authorization(self):
+    def prepare_request_for_authorization(self):
         nonce = self.generate_nonce()
         msg_body = {
             "response_type": "vp_token",
