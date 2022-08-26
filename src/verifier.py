@@ -23,6 +23,7 @@ class Verifier(Server):
         self.public_did = ssi_util.create_random_did()
         self.client_pub_key = None
         self.client_did = None
+        self.previous_nonces = {}
 
     # Utility method to sign a message and create an encrypted package containing the message and its signature
     def prepare_encrypted_packet(self, msg):
@@ -49,18 +50,18 @@ class Verifier(Server):
         This does not resemble a 'real' session establishment process like the DIDComm or OIDC variants """
     def mock_session_establishment(self):
         self.establish_connection()
-        print("Preparing first message")
+        print("Preparing message 0.1")
         msg = pickle.dumps(self.public_key)
         packet = self.prepare_packet(msg)
         self.send(packet)
         packet = self.receive()
-        print("Received message 2")
+        print("Received message 0.2")
         packet = rsa_crypto.decrypt_blob(packet, self.__private_key.read_bytes())
         msg, sign = pickle.loads(packet)
         self.client_pub_key, self.client_did = pickle.loads(msg)
         if not self.verify_packet(msg, sign):
             return
-        print("Preparing message 3")
+        print("Preparing message 0.3")
         msg = pickle.dumps(self.public_did)
         packet = self.prepare_encrypted_packet(msg)
         self.send(packet)
@@ -76,13 +77,16 @@ class Verifier(Server):
 
     """ Method to model the first part of the presentation exchange, where the verifier presents their authorization 
     certificate for the context of the transaction to the wallet which in turn computes which attributes the verifier 
-    may request"""
+    may request """
     def present_auth_certificate(self, auth_cert):
         pass
 
     """ Method to model the second part of the presentation exchange, i.e. the "actual" presentation exchange """
     def data_request(self):
         pass
+
+    def generate_nonce(self):
+        return uuid.uuid4().hex
 
     def run(self):
         self.mock_session_establishment()

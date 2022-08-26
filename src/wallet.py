@@ -1,6 +1,9 @@
+import json
 import os
 import pickle
 import threading
+import uuid
+
 from utils import rsa_crypto, ssi_util
 from utils.client import Client
 from pathlib import Path
@@ -20,6 +23,7 @@ class Wallet(Client):
         self.public_did = ssi_util.create_random_did()
         self.server_pub_key = None
         self.server_did = None
+        self.previous_nonces = {}
 
     # Utility method to sign a message and create an encrypted package containing the message and its signature
     def prepare_encrypted_packet(self, msg):
@@ -43,25 +47,27 @@ class Wallet(Client):
 
     """ Mocked session establishment where wallet and verifier share identifiers and cryptographic keys 
     This does not resemble a 'real' session establishment process like the DIDComm or OIDC variants """
+
     def mock_session_establishment(self, port):
         self.establish_connection(port)
         packet = self.receive()
-        print("Received message 1")
+        print("Received message 0.1")
         msg, sign = pickle.loads(packet)
         self.server_pub_key = pickle.loads(msg)
         if not self.verify_packet(msg, sign):
             return
-        print("Preparing message 2")
+        print("Preparing message 0.2")
         msg = pickle.dumps((self.public_key, self.public_did))
         packet = self.prepare_encrypted_packet(msg)
         self.send(packet)
         packet = self.receive()
-        print("Received message 3")
+        print("Received message 0.3")
         packet = rsa_crypto.decrypt_blob(packet, self.__private_key.read_bytes())
         msg, sign = pickle.loads(packet)
         if not self.verify_packet(msg, sign):
             return
         self.server_did = pickle.loads(msg)
+        print("Session established successfully")
 
     # "Super"-method to model the proposed extended presentation exchange with contextual access permissions
     def presentation_exchange(self):
@@ -69,14 +75,65 @@ class Wallet(Client):
         self.process_data_request()
 
     """ Method to model the first part of the presentation exchange, where the verifier presents their authorization 
-        certificate for the context of the transaction to the wallet which in turn computes which attributes the verifier 
-        may request """
+        certificate for the context of the transaction to the wallet which in turn computes which attributes the 
+        verifier may request. """
     def determine_access_permissions(self):
-        pass
+        msg = self.request_for_authorization()
+        packet = self.prepare_encrypted_packet(msg)
+        self.send(packet)
+
+    """" Generates a message to request the disclosure of a contextual authorization certificate.
+     This message is modeled after the authentication request message of the OpenID for Verifiable Presentations 
+     standard (https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-request) """
+    def request_for_authorization(self):
+        nonce = self.generate_nonce()
+        msg_body = {
+            "response_type": "vp_token",
+            "client_id": "https%3A%2F%2Fclient.example.org%2Fcb",
+            "redirect_uri": "https%3A%2F%2Fclient.example.org%2Fcb",
+            "presentation_definition": {
+                "id": "Request for contextual authorization",
+                "input_descriptors": [
+                    {
+                        "id": "Verifier Authorization Credential",
+                        "format": {
+                            "ldp_vc": {
+                                "proof_type": [
+                                    "Ed25519Signature2018"
+                                ]
+                            }
+                        },
+                        "constraints": {
+                            "fields": [
+                                {
+                                    "path": [
+                                        "$.type"
+                                    ],
+                                    "filter": {
+                                        "type": "string",
+                                        "pattern": "VerifierAuthorizationCredential"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "nonce": nonce
+        }
+        return json.dumps(msg_body)
 
     """ Method to model the second part of the presentation exchange, i.e. the "actual" presentation exchange """
+
     def process_data_request(self):
         pass
+
+    def evaluate_decision_model(self):
+
+        pass
+
+    def generate_nonce(self):
+        return uuid.uuid4().hex
 
     def run(self):
         self.mock_session_establishment(13374)
