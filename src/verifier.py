@@ -75,10 +75,9 @@ class Verifier(Server):
             return True
 
     # "Super"-method to model the proposed extended presentation exchange with contextual access permissions
-    def presentation_exchange(self, context_id):
+    def presentation_exchange(self, context_id, description):
         print("Generating auth certificate")
         authorizer_did = ssi_util.create_random_did()
-        description = "This is a test"
         auth_cert = json.loads(ssi_util.create_auth_cert(authorizer_did, self.public_did, context_id, description))
         self.present_auth_certificate(auth_cert)
         self.data_request()
@@ -151,6 +150,7 @@ class Verifier(Server):
 
     def run(self):
         self.mock_session_establishment()
-        f = open(f'{self.directory}/decision_models/contextIDs.json')
-        context_id = json.loads(f.read())["notaris"]
-        self.presentation_exchange(context_id)
+        f = open(f'{self.directory}/decision_models/contextIDs.json').read()
+        context_id = json.loads(f)["notaris"]["id"]
+        description = json.loads(f)["notaris"]["description"]
+        self.presentation_exchange(context_id, description)

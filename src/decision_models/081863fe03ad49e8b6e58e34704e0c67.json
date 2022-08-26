@@ -1,5 +1,5 @@
 {
-	"contextID": "081863fe03ad49e8b6e58e34704e0c67"
-	"rule_amount": 1,
+	"contextID": "081863fe03ad49e8b6e58e34704e0c67",
+	"amount_rules": 1,
 	"r_1": "mayRequest({DeathCertificateCredential.nameDeceased, WillCredential.nameExecutor, IDCardCredential.name}, null)"
 }

@@ -92,10 +92,13 @@ class Wallet(Client):
         if not self.verify_packet(msg, sign):
             return
         msg = json.loads(pickle.loads(msg))
-        self.process_auth_cert(msg)
+        context_id = self.process_auth_cert(msg)
 
         # Obtaining of the decision model is mocked here
-
+        dec_model_file = open(f'{self.directory}/decision_models/{context_id}.json')
+        dec_model = json.loads(dec_model_file.read())
+        dec_model_file.close()
+        permitted_attributes = self.evaluate_decision_model(dec_model)
 
     """" Generates a message to request the disclosure of a contextual authorization certificate.
      This message is modeled after the authentication request message of the OpenID for Verifiable Presentations 
@@ -148,9 +151,9 @@ class Wallet(Client):
         cert_subject = msg['vp_token']['credentialSubject']['id']
         if not cert_subject == self.server_did:
             return
-        ctxt_id = msg['vp_token']['credentialSubject']['context']['contextID']
+        context_id = msg['vp_token']['credentialSubject']['context']['contextID']
         dec_model_uri = msg['vp_token']['credentialSubject']['context']['decisionModel']
-        if not ctxt_id == dec_model_uri[(len(dec_model_uri)-len(str(ctxt_id))):]:
+        if not context_id == dec_model_uri[(len(dec_model_uri)-len(str(context_id))):]:
             return
         description = msg['vp_token']['credentialSubject']['context']['description']
         print(f"The services claims that the purpose of this transaction is the following:\n\n{description}\n\nIs this "
@@ -159,13 +162,28 @@ class Wallet(Client):
         if not (ans == "Y" or ans == "y"):
             return
         print("Authorization certificate processed successfully")
+        return context_id
+
+    """" Method to evaluate a decision model and compute the permitted set of attributes """
+    def evaluate_decision_model(self, dec_model):
+        permitted_attributes = set()
+        amount_rules = int(dec_model["amount_rules"])
+        for x in range(amount_rules):
+            rule = dec_model[f"r_{x+1}"]
+            predicate = rule[:rule.find('(')]
+            match predicate:
+                case "mayRequest":
+                    return
+                case "mayRequestOne":
+                    return
+                case "mayRequestN":
+                    return
+                case _:
+                    return
+        return permitted_attributes
 
     """ Method to model the second part of the presentation exchange, i.e. the "actual" presentation exchange """
     def process_data_request(self):
-        pass
-
-    def evaluate_decision_model(self):
-
         pass
 
     def generate_nonce(self):
