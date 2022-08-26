@@ -19,7 +19,7 @@ class Verifier(Server):
         self.id = f'verifier{port}'
         rsa_crypto.generate_new_key_pair(self.id)
         self.__private_key = Path(f'{self.directory}/utils/keys/{self.id}private.pem')
-        self.public_key = Path(Path(f'{self.directory}/utils/keys/{self.id}public.pem'))
+        self.public_key = Path(f'{self.directory}/utils/keys/{self.id}public.pem')
         self.public_did = ssi_util.create_random_did()
         self.client_pub_key = None
         self.client_did = None
@@ -48,7 +48,6 @@ class Verifier(Server):
 
     """ Mocked session establishment where wallet and verifier share identifiers and cryptographic keys 
         This does not resemble a 'real' session establishment process like the DIDComm or OIDC variants """
-
     def mock_session_establishment(self):
         self.establish_connection()
         print("Preparing message 0.1")
@@ -68,7 +67,6 @@ class Verifier(Server):
         self.send(packet)
 
     """" Method to verify that a nonce has not been re-used """
-
     def nonce_verification(self, nonce):
         if nonce in self.previous_nonces:
             return False
@@ -77,11 +75,10 @@ class Verifier(Server):
             return True
 
     # "Super"-method to model the proposed extended presentation exchange with contextual access permissions
-    def presentation_exchange(self):
+    def presentation_exchange(self, context_id):
         print("Generating auth certificate")
         authorizer_did = ssi_util.create_random_did()
-        description = ""
-        context_id = uuid.uuid4().hex
+        description = "This is a test"
         auth_cert = json.loads(ssi_util.create_auth_cert(authorizer_did, self.public_did, context_id, description))
         self.present_auth_certificate(auth_cert)
         self.data_request()
@@ -90,6 +87,7 @@ class Verifier(Server):
     certificate for the context of the transaction to the wallet which in turn computes which attributes the verifier 
     may request """
     def present_auth_certificate(self, auth_cert):
+        # Message 1
         packet = self.receive()
         print("Received message 1")
         packet = rsa_crypto.decrypt_blob(packet, self.__private_key.read_bytes())
@@ -99,8 +97,10 @@ class Verifier(Server):
         msg = json.loads(pickle.loads(msg))
         nonce = msg["nonce"]
         self.process_auth_request(msg, nonce)
+
+        # Message 2
         print("Preparing message 2")
-        msg = self.prepare_presentation_auth_cert(nonce)
+        msg = self.prepare_presentation_auth_cert(nonce, auth_cert)
         packet = self.prepare_encrypted_packet(pickle.dumps(msg))
         self.send(packet)
 
@@ -151,4 +151,6 @@ class Verifier(Server):
 
     def run(self):
         self.mock_session_establishment()
-        self.presentation_exchange()
+        f = open(f'{self.directory}/decision_models/contextIDs.json')
+        context_id = json.loads(f.read())["notaris"]
+        self.presentation_exchange(context_id)

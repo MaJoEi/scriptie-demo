@@ -23,7 +23,7 @@ class Wallet(Client):
         self.public_did = ssi_util.create_random_did()
         self.server_pub_key = None
         self.server_did = None
-        self.previous_nonces = set()
+        self.current_nonce = 0
 
     # Utility method to sign a message and create an encrypted package containing the message and its signature
     def prepare_encrypted_packet(self, msg):
@@ -78,16 +78,30 @@ class Wallet(Client):
         certificate for the context of the transaction to the wallet which in turn computes which attributes the 
         verifier may request. """
     def determine_access_permissions(self):
+        # Message 1
         print("Preparing message 1")
         msg = self.prepare_request_for_authorization()
         packet = self.prepare_encrypted_packet(pickle.dumps(msg))
         self.send(packet)
 
+        #Message 2
+        packet = self.receive()
+        print("Received message 2")
+        packet = rsa_crypto.decrypt_blob(packet, self.__private_key.read_bytes())
+        msg, sign = pickle.loads(packet)
+        if not self.verify_packet(msg, sign):
+            return
+        msg = json.loads(pickle.loads(msg))
+        self.process_auth_cert(msg)
+
+        # Obtaining of the decision model is mocked here
+
+
     """" Generates a message to request the disclosure of a contextual authorization certificate.
      This message is modeled after the authentication request message of the OpenID for Verifiable Presentations 
      standard (https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-request) """
     def prepare_request_for_authorization(self):
-        nonce = self.generate_nonce()
+        self.current_nonce = self.generate_nonce()
         msg_body = {
             "response_type": "vp_token",
             "client_id": "https://client.example.org/",
@@ -120,12 +134,33 @@ class Wallet(Client):
                     }
                 ]
             },
-            "nonce": nonce
+            "nonce": self.current_nonce
         }
         return json.dumps(msg_body)
 
-    """ Method to model the second part of the presentation exchange, i.e. the "actual" presentation exchange """
+    """" Mocks the processing of the authorization certificates. This methods checks the nonce re-usage and 
+        verifies that the verifier is indeed the subject of the certificate as well as whether the contextID matches
+        the url of the decision model.It also asks the user to verify whether the description claim is accurate. 
+        It does not verify the signature or check any other fields, which would be necessary in a "real" application """
+    def process_auth_cert(self, msg):
+        if not self.verify_nonce(msg["nonce"]):
+            return
+        cert_subject = msg['vp_token']['credentialSubject']['id']
+        if not cert_subject == self.server_did:
+            return
+        ctxt_id = msg['vp_token']['credentialSubject']['context']['contextID']
+        dec_model_uri = msg['vp_token']['credentialSubject']['context']['decisionModel']
+        if not ctxt_id == dec_model_uri[(len(dec_model_uri)-len(str(ctxt_id))):]:
+            return
+        description = msg['vp_token']['credentialSubject']['context']['description']
+        print(f"The services claims that the purpose of this transaction is the following:\n\n{description}\n\nIs this "
+              f"accurate? [Y/n]")
+        ans = str(input())
+        if not (ans == "Y" or ans == "y"):
+            return
+        print("Authorization certificate processed successfully")
 
+    """ Method to model the second part of the presentation exchange, i.e. the "actual" presentation exchange """
     def process_data_request(self):
         pass
 
@@ -135,6 +170,9 @@ class Wallet(Client):
 
     def generate_nonce(self):
         return uuid.uuid4().hex
+
+    def verify_nonce(self, nonce):
+        return nonce == self.current_nonce
 
     def run(self):
         self.mock_session_establishment(13374)
