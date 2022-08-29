@@ -43,16 +43,13 @@ didcreate_body = {
 didresp = requests.post(didcreate_url, json=didcreate_body)
 print(didresp.text)"""
 
-test_wallet = Wallet(1)
-test_verifier = Verifier(13374, 2)
-test_verifier.start()
-test_wallet.start()
+# test_wallet = Wallet(1)
+# test_verifier = Verifier(13374, 2)
+# test_verifier.start()
+# test_wallet.start()
+
+s = "(lessThan(val(PensionCredential.amount),30000) AND greaterThan(val(IDCardCredential.age),80) OR " \
+    "equals(val(PensionCredential.amount),10000))"
+
 
 # ssi_util.create_and_export_keypair(123)
-
-
-
-# test_client = Client(1)
-# test_server = Server(13374, 2)
-# test_client.start()
-# test_server.start()

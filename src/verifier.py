@@ -151,6 +151,6 @@ class Verifier(Server):
     def run(self):
         self.mock_session_establishment()
         f = open(f'{self.directory}/decision_models/contextIDs.json').read()
-        context_id = json.loads(f)["notaris"]["id"]
-        description = json.loads(f)["notaris"]["description"]
+        context_id = json.loads(f)["app_form"]["id"]
+        description = json.loads(f)["app_form"]["description"]
         self.presentation_exchange(context_id, description)

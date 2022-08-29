@@ -47,7 +47,6 @@ class Wallet(Client):
 
     """ Mocked session establishment where wallet and verifier share identifiers and cryptographic keys 
     This does not resemble a 'real' session establishment process like the DIDComm or OIDC variants """
-
     def mock_session_establishment(self, port):
         self.establish_connection(port)
         packet = self.receive()
@@ -84,7 +83,7 @@ class Wallet(Client):
         packet = self.prepare_encrypted_packet(pickle.dumps(msg))
         self.send(packet)
 
-        #Message 2
+        # Message 2
         packet = self.receive()
         print("Received message 2")
         packet = rsa_crypto.decrypt_blob(packet, self.__private_key.read_bytes())
@@ -98,6 +97,8 @@ class Wallet(Client):
         dec_model_file = open(f'{self.directory}/decision_models/{context_id}.json')
         dec_model = json.loads(dec_model_file.read())
         dec_model_file.close()
+        if not dec_model["contextID"] == context_id:
+            return
         permitted_attributes = self.evaluate_decision_model(dec_model)
 
     """" Generates a message to request the disclosure of a contextual authorization certificate.
@@ -153,7 +154,7 @@ class Wallet(Client):
             return
         context_id = msg['vp_token']['credentialSubject']['context']['contextID']
         dec_model_uri = msg['vp_token']['credentialSubject']['context']['decisionModel']
-        if not context_id == dec_model_uri[(len(dec_model_uri)-len(str(context_id))):]:
+        if not context_id == dec_model_uri[(len(dec_model_uri) - len(str(context_id))):]:
             return
         description = msg['vp_token']['credentialSubject']['context']['description']
         print(f"The services claims that the purpose of this transaction is the following:\n\n{description}\n\nIs this "
@@ -169,37 +170,209 @@ class Wallet(Client):
         permitted_attributes = set()
         amount_rules = int(dec_model["amount_rules"])
         for x in range(amount_rules):
-            rule = dec_model[f"r_{x+1}"]
-            index_predicate = rule.find('(')
-            predicate = rule[:index_predicate]
-            attributes = rule[index_predicate+2:rule.find(';')-1]
-            attributes = attributes.split(', ')
-            condition = rule[rule.find(';')+2:len(rule)-1]
-            print(attributes)
-            print(condition)
-            match predicate:
-                case "mayRequest":
-                    permitted_attributes = self.mayRequest(attributes, condition, permitted_attributes)
-                    return
-                case "mayRequestOne":
-                    return
-                case "mayRequestN":
-                    return
-                case _:
-                    return
+            rule = dec_model[f"r_{x + 1}"]
+            permitted_attributes.update(self.process_rule(rule, dec_model))
+            # index_predicate = rule.find('(')
+            # predicate = rule[:index_predicate]
+            # attributes = rule[index_predicate+2:rule.find(';')-1]
+            # attributes = attributes.split(', ')
+            # condition = rule[rule.find(';')+2:len(rule)-1]
+            # print(attributes)
+            # print(condition)
+            # match predicate:
+            #     case "mayRequest":
+            #         permitted_attributes.update(self.mayRequest(attributes, condition, permitted_attributes))
+            #         break
+            #     case "mayRequestOne":
+            #         permitted_attributes = self.mayRequestOne(attributes, condition, permitted_attributes, dec_model)
+            #         break
+            #     case "mayRequestN":
+            #         permitted_attributes = self.mayRequestN(attributes, condition, permitted_attributes, dec_model)
+            #         break
+            #     case _:
+            #         return
         return permitted_attributes
+
+    """ Util method to process a rule predicate """
+
+    def process_rule(self, rule, dec_model):
+        index_predicate = rule.find('(')
+        predicate = rule[:index_predicate]
+        attributes = rule[index_predicate + 2:rule.find(';') - 1]
+        attributes = attributes.split(', ')
+        condition = rule[rule.find(';') + 2:len(rule) - 1]
+        print(attributes)
+        print(condition)
+        match predicate:
+            case "mayRequest":
+                return self.mayRequest(attributes, condition)
+            case "mayRequestOne":
+                return self.mayRequestOne(attributes, condition, dec_model)
+            case "mayRequestN":
+                return self.mayRequestN(attributes, condition, dec_model)
+            case _:
+                return
 
     """ Processes rule predicates of the type 'mayRequest' and returns the set of attribute that may be requested 
     according to this predicate """
-    def mayRequest(self, attributes, condition, permitted_attributes):
+    def mayRequest(self, attributes, condition):
         if not condition == "null":
-            condition = condition.split()
-            return
+            if not self.process_condition(condition):
+                return
+        return attributes
+
+    """ Processes rule predicates of the type 'mayRequestOne' and returns the set of attribute that may be requested 
+        according to this predicate """
+    def mayRequestOne(self, attributes, condition, dec_model):
+        if not condition == "null":
+            if not self.process_condition(condition):
+                return
+        attr_set = set()
+        for attr in attributes:
+            if attr.startsWith("r_"):
+                rule = dec_model[attr]
+                attr_set.add(tuple(self.process_rule(rule, dec_model)))
+            else:
+                attr_set.add(attr)
+                return
+        print("The service may request one of the following options. Which one is your preference?")
+        x = 0
+        for a in attr_set:
+            x += 1
+            print(f"{x}: {a}")
+        i = int(input())
+        if i - 1 in range(len(attr_set)):
+            return set(list(attr_set)[i])
         else:
-            #attributes = [s.replace(" ", "") for s in attributes]
-            permitted_attributes.update(attributes)
-            print(permitted_attributes)
-            return permitted_attributes
+            return
+
+    """ Processes rule predicates of the type 'mayRequestN' and returns the set of attribute that may be requested 
+        according to this predicate """
+    def mayRequestN(self, attributes, condition, dec_model):
+        if not condition == "null":
+            if not self.process_condition(condition):
+                return
+
+        attr_set = set()
+        for attr in attributes:
+            if attr.startsWith("r_"):
+                rule = dec_model[attr]
+                attr_set.add(tuple(self.process_rule(rule, dec_model)))
+            else:
+                attr_set.add(attr)
+                return
+        print("The service may optionally request one or more of the following options. Which options would you be "
+              "willing to disclose?")
+        print("0: None")
+        x = 0
+        for a in attr_set:
+            x += 1
+            print(f"{x}: {a}")
+        options = input()
+        options = options.split()
+        permitted_attributes = set()
+        for o in options:
+            i = int(o)
+            if i == 0:
+                return set()
+            elif i-1 in range(len(attr_set)):
+                permitted_attributes.update(list(attr_set)[i])
+            else:
+                return
+        return permitted_attributes
+
+    """ Util method to evaluate the condition of a specific rule predicate """
+    def process_condition(self, condition):
+        result = False
+        atomic_conditions = condition.split(" ")
+        x = 0
+        while x in range(len(atomic_conditions)):
+            if atomic_conditions[x].startswith("("):
+                y = self.find_end_statement(atomic_conditions[x+1:])
+                cond_set = " ".join(atomic_conditions[x:y+1])
+                cond_set = cond_set[1:len(cond_set)-1]
+                result = self.process_condition(cond_set)
+                x = y + 1
+            elif atomic_conditions[x] == "AND":
+                second_condition = atomic_conditions[x+1]
+                if second_condition.startswith("("):
+                    y = self.find_end_statement(atomic_conditions[x+2:])
+                    cond_set = " ".join(atomic_conditions[x+1:y+1])
+                    cond_set = cond_set[1:len(cond_set) - 1]
+                    result = result and self.process_condition(cond_set)
+                    x = y + 1
+                else:
+                    index_predicate = second_condition.find('(')
+                    predicate = second_condition[:index_predicate]
+                    args = second_condition[index_predicate+1:len(second_condition)-1].split(",")
+                    attr = args[0]
+                    attr = attr[4:len(attr) - 1].split(".")
+                    credential = attr[0]
+                    attribute = attr[1]
+                    
+                    match predicate:
+                        case "equals":
+                            result = result and (args[0] == args[1])
+                        case "greaterThan":
+                            result = result and (args[0] >= args[1])
+                        case "lessThan":
+                            result = result and (args[0] <= args[1])
+                    x += 2
+            elif atomic_conditions[x] == "OR":
+                second_condition = atomic_conditions[x + 1]
+                if second_condition.startswith("("):
+                    y = self.find_end_statement(atomic_conditions[x + 2:])
+                    cond_set = " ".join(atomic_conditions[x + 1:y + 1])
+                    cond_set = cond_set[1:len(cond_set) - 1]
+                    result = result or self.process_condition(cond_set)
+                    x = y + 1
+                else:
+                    index_predicate = second_condition.find('(')
+                    predicate = second_condition[:index_predicate]
+                    args = second_condition[index_predicate + 1:len(second_condition) - 1].split(",")
+                    match predicate:
+                        case "equals":
+                            result = result ^ (args[0] == args[1])
+                        case "greaterThan":
+                            result = result ^ (args[0] >= args[1])
+                        case "lessThan":
+                            result = result ^ (args[0] <= args[1])
+                    x += 2
+            elif atomic_conditions[x] == "XOR":
+                second_condition = atomic_conditions[x + 1]
+                if second_condition.startswith("("):
+                    y = self.find_end_statement(atomic_conditions[x + 2:])
+                    cond_set = " ".join(atomic_conditions[x + 1:y + 1])
+                    cond_set = cond_set[1:len(cond_set) - 1]
+                    result = result or self.process_condition(cond_set)
+                    x = y + 1
+                else:
+                    index_predicate = second_condition.find('(')
+                    predicate = second_condition[:index_predicate]
+                    args = second_condition[index_predicate + 1:len(second_condition) - 1].split(",")
+                    match predicate:
+                        case "equals":
+                            result = result or (args[0] == args[1])
+                        case "greaterThan":
+                            result = result or (args[0] >= args[1])
+                        case "lessThan":
+                            result = result or (args[0] <= args[1])
+                    x += 2
+            else:
+                x += 1
+                return result
+        return result
+
+    def find_end_statement(self, atoms):
+        expected_p_close = 1
+        for cond in atoms:
+            if cond.startswith("("):
+                expected_p_close += 1
+            elif cond.endswith(")"):
+                expected_p_close -= 1
+                if expected_p_close == 0:
+                    return atoms.index(cond)
+        return -1
 
     """ Method to model the second part of the presentation exchange, i.e. the "actual" presentation exchange """
     def process_data_request(self):
@@ -214,3 +387,4 @@ class Wallet(Client):
     def run(self):
         self.mock_session_establishment(13374)
         self.presentation_exchange()
+
