@@ -172,25 +172,6 @@ class Wallet(Client):
         for x in range(amount_rules):
             rule = dec_model[f"r_{x + 1}"]
             permitted_attributes.update(self.process_rule(rule, dec_model))
-            # index_predicate = rule.find('(')
-            # predicate = rule[:index_predicate]
-            # attributes = rule[index_predicate+2:rule.find(';')-1]
-            # attributes = attributes.split(', ')
-            # condition = rule[rule.find(';')+2:len(rule)-1]
-            # print(attributes)
-            # print(condition)
-            # match predicate:
-            #     case "mayRequest":
-            #         permitted_attributes.update(self.mayRequest(attributes, condition, permitted_attributes))
-            #         break
-            #     case "mayRequestOne":
-            #         permitted_attributes = self.mayRequestOne(attributes, condition, permitted_attributes, dec_model)
-            #         break
-            #     case "mayRequestN":
-            #         permitted_attributes = self.mayRequestN(attributes, condition, permitted_attributes, dec_model)
-            #         break
-            #     case _:
-            #         return
         return permitted_attributes
 
     """ Util method to process a rule predicate """
@@ -201,8 +182,6 @@ class Wallet(Client):
         attributes = rule[index_predicate + 2:rule.find(';') - 1]
         attributes = attributes.split(', ')
         condition = rule[rule.find(';') + 2:len(rule) - 1]
-        print(attributes)
-        print(condition)
         match predicate:
             case "mayRequest":
                 return self.mayRequest(attributes, condition)
@@ -216,9 +195,11 @@ class Wallet(Client):
     """ Processes rule predicates of the type 'mayRequest' and returns the set of attribute that may be requested 
     according to this predicate """
     def mayRequest(self, attributes, condition):
+        print(f"Processing a mayRequest rule with attribute {attributes} and condition {condition}")
+        # print(condition)
         if not condition == "null":
             if not self.process_condition(condition):
-                return
+                return []
         return attributes
 
     """ Processes rule predicates of the type 'mayRequestOne' and returns the set of attribute that may be requested 
@@ -226,15 +207,17 @@ class Wallet(Client):
     def mayRequestOne(self, attributes, condition, dec_model):
         if not condition == "null":
             if not self.process_condition(condition):
-                return
+                return []
         attr_set = set()
         for attr in attributes:
-            if attr.startsWith("r_"):
+            print(attr)
+            if attr.startswith("r_"):
                 rule = dec_model[attr]
-                attr_set.add(tuple(self.process_rule(rule, dec_model)))
+                res = tuple(self.process_rule(rule, dec_model))
+                if not res == ():
+                    attr_set.add(res)
             else:
                 attr_set.add(attr)
-                return
         print("The service may request one of the following options. Which one is your preference?")
         x = 0
         for a in attr_set:
@@ -242,7 +225,7 @@ class Wallet(Client):
             print(f"{x}: {a}")
         i = int(input())
         if i - 1 in range(len(attr_set)):
-            return set(list(attr_set)[i])
+            return set(list(attr_set)[i-1])
         else:
             return
 
@@ -251,16 +234,17 @@ class Wallet(Client):
     def mayRequestN(self, attributes, condition, dec_model):
         if not condition == "null":
             if not self.process_condition(condition):
-                return
+                return []
 
         attr_set = set()
         for attr in attributes:
             if attr.startsWith("r_"):
                 rule = dec_model[attr]
-                attr_set.add(tuple(self.process_rule(rule, dec_model)))
+                res = tuple(self.process_rule(rule, dec_model))
+                if not res == ():
+                    attr_set.add(res)
             else:
                 attr_set.add(attr)
-                return
         print("The service may optionally request one or more of the following options. Which options would you be "
               "willing to disclose?")
         print("0: None")
@@ -276,7 +260,7 @@ class Wallet(Client):
             if i == 0:
                 return set()
             elif i-1 in range(len(attr_set)):
-                permitted_attributes.update(list(attr_set)[i])
+                permitted_attributes.update(list(attr_set)[i-1])
             else:
                 return
         return permitted_attributes
@@ -287,6 +271,7 @@ class Wallet(Client):
         atomic_conditions = condition.split(" ")
         x = 0
         while x in range(len(atomic_conditions)):
+            # print(atomic_conditions[x])
             if atomic_conditions[x].startswith("("):
                 y = self.find_end_statement(atomic_conditions[x+1:])
                 cond_set = " ".join(atomic_conditions[x:y+1])
@@ -305,18 +290,14 @@ class Wallet(Client):
                     index_predicate = second_condition.find('(')
                     predicate = second_condition[:index_predicate]
                     args = second_condition[index_predicate+1:len(second_condition)-1].split(",")
-                    attr = args[0]
-                    attr = attr[4:len(attr) - 1].split(".")
-                    credential = attr[0]
-                    attribute = attr[1]
-
+                    attribute = self.retrieve_attribute_value(args)
                     match predicate:
                         case "equals":
-                            result = result and (args[0] == args[1])
+                            result = result and (attribute == args[1])
                         case "greaterThan":
-                            result = result and (args[0] >= args[1])
+                            result = result and (int(attribute) > int(args[1]))
                         case "lessThan":
-                            result = result and (args[0] <= args[1])
+                            result = result and (int(attribute) < int(args[1]))
                     x += 2
             elif atomic_conditions[x] == "OR":
                 second_condition = atomic_conditions[x + 1]
@@ -330,13 +311,14 @@ class Wallet(Client):
                     index_predicate = second_condition.find('(')
                     predicate = second_condition[:index_predicate]
                     args = second_condition[index_predicate + 1:len(second_condition) - 1].split(",")
+                    attribute = self.retrieve_attribute_value(args)
                     match predicate:
                         case "equals":
-                            result = result ^ (args[0] == args[1])
+                            result = result or (attribute == args[1])
                         case "greaterThan":
-                            result = result ^ (args[0] >= args[1])
+                            result = result or (int(attribute) > int(args[1]))
                         case "lessThan":
-                            result = result ^ (args[0] <= args[1])
+                            result = result or (int(attribute) < int(args[1]))
                     x += 2
             elif atomic_conditions[x] == "XOR":
                 second_condition = atomic_conditions[x + 1]
@@ -350,19 +332,42 @@ class Wallet(Client):
                     index_predicate = second_condition.find('(')
                     predicate = second_condition[:index_predicate]
                     args = second_condition[index_predicate + 1:len(second_condition) - 1].split(",")
+                    attribute = self.retrieve_attribute_value(args)
                     match predicate:
                         case "equals":
-                            result = result or (args[0] == args[1])
+                            result = result ^ (attribute == args[1])
                         case "greaterThan":
-                            result = result or (args[0] >= args[1])
+                            result = result ^ (int(attribute) > int(args[1]))
                         case "lessThan":
-                            result = result or (args[0] <= args[1])
+                            result = result ^ (int(attribute) < int(args[1]))
                     x += 2
             else:
+                index_predicate = atomic_conditions[x].find('(')
+                predicate = atomic_conditions[x][:index_predicate]
+                args = atomic_conditions[x][index_predicate + 1:len(atomic_conditions[x]) - 1].split(",")
+                attribute = self.retrieve_attribute_value(args)
+                match predicate:
+                    case "equals":
+                        result = attribute == args[1]
+                    case "greaterThan":
+                        result = int(attribute) > int(args[1])
+                    case "lessThan":
+                        result = int(attribute) < int(args[1])
                 x += 1
-                return result
         return result
 
+    """ Util method to retrieve the value of a specific attribute from a credential """
+    def retrieve_attribute_value(self, args):
+        attr = args[0]
+        attr = attr[4:len(attr) - 1].split(".")
+        credential_type = attr[0]
+        attribute_type = attr[1]
+        file = open(f'{self.directory}/mock_credentials/{credential_type}.json')
+        credential = json.loads(file.read())
+        file.close()
+        return credential["credentialSubject"][attribute_type]
+
+    """ Util method to find out where a statement in parentheses ends """
     def find_end_statement(self, atoms):
         expected_p_close = 1
         for cond in atoms:
