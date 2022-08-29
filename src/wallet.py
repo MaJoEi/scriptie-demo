@@ -309,7 +309,7 @@ class Wallet(Client):
                     attr = attr[4:len(attr) - 1].split(".")
                     credential = attr[0]
                     attribute = attr[1]
-                    
+
                     match predicate:
                         case "equals":
                             result = result and (args[0] == args[1])
