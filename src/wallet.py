@@ -23,7 +23,7 @@ class Wallet(Client):
         self.public_did = ssi_util.create_random_did()
         self.server_pub_key = None
         self.server_did = None
-        self.current_nonce = 0
+        self.__current_nonce = 0
 
     # Utility method to sign a message and create an encrypted package containing the message and its signature
     def prepare_encrypted_packet(self, msg):
@@ -104,7 +104,7 @@ class Wallet(Client):
      This message is modeled after the authentication request message of the OpenID for Verifiable Presentations 
      standard (https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-request) """
     def prepare_request_for_authorization(self):
-        self.current_nonce = self.generate_nonce()
+        self.__current_nonce = self.generate_nonce()
         msg_body = {
             "response_type": "vp_token",
             "client_id": "https://client.example.org/",
@@ -137,7 +137,7 @@ class Wallet(Client):
                     }
                 ]
             },
-            "nonce": self.current_nonce
+            "nonce": self.__current_nonce
         }
         return json.dumps(msg_body)
 
@@ -170,9 +170,16 @@ class Wallet(Client):
         amount_rules = int(dec_model["amount_rules"])
         for x in range(amount_rules):
             rule = dec_model[f"r_{x+1}"]
-            predicate = rule[:rule.find('(')]
+            index_predicate = rule.find('(')
+            predicate = rule[:index_predicate]
+            attributes = rule[index_predicate+2:rule.find(';')-1]
+            attributes = attributes.split(', ')
+            condition = rule[rule.find(';')+2:len(rule)-1]
+            print(attributes)
+            print(condition)
             match predicate:
                 case "mayRequest":
+                    permitted_attributes = self.mayRequest(attributes, condition, permitted_attributes)
                     return
                 case "mayRequestOne":
                     return
@@ -182,6 +189,18 @@ class Wallet(Client):
                     return
         return permitted_attributes
 
+    """ Processes rule predicates of the type 'mayRequest' and returns the set of attribute that may be requested 
+    according to this predicate """
+    def mayRequest(self, attributes, condition, permitted_attributes):
+        if not condition == "null":
+            condition = condition.split()
+            return
+        else:
+            #attributes = [s.replace(" ", "") for s in attributes]
+            permitted_attributes.update(attributes)
+            print(permitted_attributes)
+            return permitted_attributes
+
     """ Method to model the second part of the presentation exchange, i.e. the "actual" presentation exchange """
     def process_data_request(self):
         pass
@@ -190,7 +209,7 @@ class Wallet(Client):
         return uuid.uuid4().hex
 
     def verify_nonce(self, nonce):
-        return nonce == self.current_nonce
+        return nonce == self.__current_nonce
 
     def run(self):
         self.mock_session_establishment(13374)

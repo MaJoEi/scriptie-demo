@@ -3,7 +3,16 @@
 		"id": "081863fe03ad49e8b6e58e34704e0c67",
 		"description": "Check if whether the bank account holder has passed away and the holder has\nbeen authorized to access the account in their will"
 	},
-	"app_form": "bda90835c9fa4617ad86d0ae8c0d3e3f",
-	"hypotheek": "e12802d4a51745b8b671a11a79b8e530",
-	"albert_heijn": "55e741d7d6de412588dc74543abd2afc"
+	"app_form": {
+		"id": "bda90835c9fa4617ad86d0ae8c0d3e3f",
+		"description": "Fill in application form to receive a government subsidy for home aid"
+	},
+	"hypotheek": {
+		"id": "e12802d4a51745b8b671a11a79b8e530",
+		"description": ""
+	},
+	"albert_heijn": {
+		"id": "55e741d7d6de412588dc74543abd2afc",
+		"description": ""
+	}
 }
