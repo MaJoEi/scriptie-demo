@@ -49,6 +49,7 @@ class Wallet(Client):
 
     """ Mocked session establishment where wallet and verifier share identifiers and cryptographic keys 
     This does not resemble a 'real' session establishment process like the DIDComm or OIDC variants """
+
     def __mock_session_establishment(self, port):
         self.establish_connection(port)
         packet = self.receive()
@@ -73,11 +74,12 @@ class Wallet(Client):
     # "Super"-method to model the proposed extended presentation exchange with contextual access permissions
     def __presentation_exchange(self):
         permitted_attributes = self.__determine_access_permissions()
-        self.process_data_request(permitted_attributes)
+        self.__data_request(permitted_attributes)
 
     """ Method to model the first part of the presentation exchange, where the verifier presents their authorization 
         certificate for the context of the transaction to the wallet which in turn computes which attributes the 
         verifier may request. """
+
     def __determine_access_permissions(self):
         # Message 1
         print("Preparing message 1")
@@ -108,7 +110,7 @@ class Wallet(Client):
         # Returning the result to the verifier
         print("Preparing message 3")
         self.__current_nonce = self.generate_nonce()
-        msg_body= {
+        msg_body = {
             "response_type": "mock",
             "client_id": "https://client.example.org/",
             "redirect_uri": "https://client.example.org/",
@@ -123,6 +125,7 @@ class Wallet(Client):
     """" Generates a message to request the disclosure of a contextual authorization certificate.
      This message is modeled after the authentication request message of the OpenID for Verifiable Presentations 
      standard (https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-request) """
+
     def __prepare_request_for_authorization(self):
         self.__current_nonce = self.generate_nonce()
         msg_body = {
@@ -165,6 +168,7 @@ class Wallet(Client):
         verifies that the verifier is indeed the subject of the certificate as well as whether the contextID matches
         the url of the decision model.It also asks the user to verify whether the description claim is accurate. 
         It does not verify the signature or check any other fields, which would be necessary in a "real" application """
+
     def __process_auth_cert(self, msg):
         if not self.__verify_challenge(msg["nonce"]):
             return
@@ -185,6 +189,7 @@ class Wallet(Client):
         return context_id
 
     """" Method to evaluate a decision model and compute the permitted set of attributes """
+
     def __evaluate_decision_model(self, dec_model):
         permitted_attributes = set()
         amount_rules = int(dec_model["amount_rules"])
@@ -213,6 +218,7 @@ class Wallet(Client):
 
     """ Processes rule predicates of the type 'mayRequest' and returns the set of attribute that may be requested 
     according to this predicate """
+
     def __mayRequest(self, attributes, condition):
         # print(condition)
         if not condition == "null":
@@ -222,6 +228,7 @@ class Wallet(Client):
 
     """ Processes rule predicates of the type 'mayRequestOne' and returns the set of attribute that may be requested 
         according to this predicate """
+
     def __mayRequestOne(self, attributes, condition, dec_model):
         if not condition == "null":
             if not self.__process_condition(condition):
@@ -242,12 +249,13 @@ class Wallet(Client):
             print(f"{x}: {a}")
         i = int(input())
         if i - 1 in range(len(attr_set)):
-            return set(list(attr_set)[i-1])
+            return set(list(attr_set)[i - 1])
         else:
             return
 
     """ Processes rule predicates of the type 'mayRequestN' and returns the set of attribute that may be requested 
         according to this predicate """
+
     def __mayRequestN(self, attributes, condition, dec_model):
         if not condition == "null":
             if not self.__process_condition(condition):
@@ -276,13 +284,14 @@ class Wallet(Client):
             i = int(o)
             if i == 0:
                 return set()
-            elif i-1 in range(len(attr_set)):
-                permitted_attributes.update(list(attr_set)[i-1])
+            elif i - 1 in range(len(attr_set)):
+                permitted_attributes.update(list(attr_set)[i - 1])
             else:
                 return
         return permitted_attributes
 
     """ Util method to evaluate the condition of a specific rule predicate """
+
     def __process_condition(self, condition):
         result = False
         atomic_conditions = condition.split(" ")
@@ -291,22 +300,22 @@ class Wallet(Client):
             # print(atomic_conditions[x])
             if atomic_conditions[x].startswith("("):
                 y = self.__find_end_statement(atomic_conditions[x + 1:])
-                cond_set = " ".join(atomic_conditions[x:y+1])
-                cond_set = cond_set[1:len(cond_set)-1]
+                cond_set = " ".join(atomic_conditions[x:y + 1])
+                cond_set = cond_set[1:len(cond_set) - 1]
                 result = self.__process_condition(cond_set)
                 x = y + 1
             elif atomic_conditions[x] == "AND":
-                second_condition = atomic_conditions[x+1]
+                second_condition = atomic_conditions[x + 1]
                 if second_condition.startswith("("):
                     y = self.__find_end_statement(atomic_conditions[x + 2:])
-                    cond_set = " ".join(atomic_conditions[x+1:y+1])
+                    cond_set = " ".join(atomic_conditions[x + 1:y + 1])
                     cond_set = cond_set[1:len(cond_set) - 1]
                     result = result and self.__process_condition(cond_set)
                     x = y + 1
                 else:
                     index_predicate = second_condition.find('(')
                     predicate = second_condition[:index_predicate]
-                    args = second_condition[index_predicate+1:len(second_condition)-1].split(",")
+                    args = second_condition[index_predicate + 1:len(second_condition) - 1].split(",")
                     attribute = self.__retrieve_attribute_value(args)
                     match predicate:
                         case "equals":
@@ -374,6 +383,7 @@ class Wallet(Client):
         return result
 
     """ Util method to retrieve the value of a specific attribute from a credential """
+
     def __retrieve_attribute_value(self, args):
         attr = args[0]
         attr = attr[4:len(attr) - 1].split(".")
@@ -385,6 +395,7 @@ class Wallet(Client):
         return credential["credentialSubject"][attribute_type]
 
     """ Util method to find out where a statement in parentheses ends """
+
     def __find_end_statement(self, atoms):
         expected_p_close = 1
         for cond in atoms:
@@ -396,9 +407,45 @@ class Wallet(Client):
                     return atoms.index(cond)
         return -1
 
-    """ Method to model the second part of the presentation exchange, i.e. the "actual" presentation exchange """
-    def process_data_request(self, permitted_attributes):
-        pass
+    """ Method to model the second part of the presentation exchange, i.e. the "classic" presentation exchange """
+
+    def __data_request(self, permitted_attributes):
+        # Data request
+        packet = self.receive()
+        print("Received data request")
+        packet = rsa_crypto.decrypt_blob(packet, self.__private_key.read_bytes())
+        msg, sign = pickle.loads(packet)
+        if not self.__verify_packet(msg, sign):
+            return
+        msg = json.loads(pickle.loads(msg))
+        nonce = msg["nonce"]
+        if not self.__verify_challenge(msg["nonce_challenge"]) or not self.__check_nonce_reuse(nonce):
+            return
+        valid_request, requested_attributes = self.__verify_access_policy(permitted_attributes, msg)
+        if not valid_request:
+            return
+        print(requested_attributes)
+
+        # Data disclosure
+        
+
+    def __verify_access_policy(self, permitted_attributes, msg):
+        data_request = msg['presentation_definition']['input_descriptors']
+        requested_attributes = set()
+        for request in data_request:
+            credential = request['constraints']['fields']
+            credential_type = credential[0]['filter']['pattern']
+            for c in credential:
+                if not c == credential[0]:
+                    attribute_path = c['path'][0]
+                    attribute_path = attribute_path.split(".")
+                    attribute = attribute_path[2]
+                    attribute = f"{credential_type}.{attribute}"
+                    if attribute not in permitted_attributes:
+                        return False, set()
+                    else:
+                        requested_attributes.add(attribute)
+        return True, requested_attributes
 
     def generate_nonce(self):
         return uuid.uuid4().hex
@@ -406,7 +453,15 @@ class Wallet(Client):
     def __verify_challenge(self, nonce):
         return nonce == self.__current_nonce
 
+    """" Method to verify that a nonce has not been re-used """
+
+    def __check_nonce_reuse(self, nonce):
+        if nonce in self.__previous_nonces:
+            return False
+        else:
+            self.__previous_nonces.add(nonce)
+            return True
+
     def run(self):
         self.__mock_session_establishment(13374)
         self.__presentation_exchange()
-

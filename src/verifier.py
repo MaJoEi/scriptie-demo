@@ -25,6 +25,7 @@ class Verifier(Server):
         self.client_pub_key = None
         self.client_did = None
         self.__previous_nonces = set()
+        self.__current_nonce = 0
 
     # Utility method to sign a message and create an encrypted package containing the message and its signature
     def __prepare_encrypted_packet(self, msg):
@@ -67,14 +68,6 @@ class Verifier(Server):
         packet = self.__prepare_encrypted_packet(msg)
         self.send(packet)
 
-    """" Method to verify that a nonce has not been re-used """
-    def __nonce_verification(self, nonce):
-        if nonce in self.__previous_nonces:
-            return False
-        else:
-            self.__previous_nonces.add(nonce)
-            return True
-
     # "Super"-method to model the proposed extended presentation exchange with contextual access permissions
     def __presentation_exchange(self, context_id, description):
         print("Generating auth certificate")
@@ -113,7 +106,7 @@ class Verifier(Server):
             return
         msg = json.loads(pickle.loads(msg), object_hook=as_python_object)
         nonce = msg["nonce"]
-        if not self.__nonce_verification(nonce):
+        if not self.__check_nonce_reuse(nonce):
             return
         permitted_attributes = msg["permitted_attributes"]
         return permitted_attributes, nonce
@@ -147,7 +140,7 @@ class Verifier(Server):
     verifying that it is indeed asking for a VerifierAuthorizationCredential. Other fields are ignored. In a real 
     application, all fields would need to be processed """
     def __process_auth_request(self, msg, nonce):
-        if not self.__nonce_verification(nonce):
+        if not self.__check_nonce_reuse(nonce):
             self.interrupt_connection()
             return False
         requested_type = msg["presentation_definition"]["input_descriptors"][0]["constraints"]["fields"][0]["filter"][
@@ -158,15 +151,20 @@ class Verifier(Server):
 
     """ Method to model the second part of the presentation exchange, i.e. the "actual" presentation exchange """
     def __data_request(self, permitted_attributes, challenge):
+        # Data request
         print("Preparing data request")
         msg = self.__prepare_data_request(permitted_attributes, challenge)
         packet = self.__prepare_encrypted_packet(pickle.dumps(msg))
         self.send(packet)
 
+        # Response to data request
+        # packet = self.receive()
+
     """ Prepares the data request in the form of a (mocked) OpenID Authorization Request """
     def __prepare_data_request(self, permitted_attributes, challenge):
         credential_types, attribute_dict = self.__group_attributes_by_credential(sorted(permitted_attributes))
         input_descriptors = []
+        self.__current_nonce = self.generate_nonce()
         for c in credential_types:
             descriptor = {
                 "id": f"{c} with constraints",
@@ -210,7 +208,7 @@ class Verifier(Server):
                 "input_descriptors": input_descriptors
             },
             "nonce_challenge": challenge,
-            "nonce": self.generate_nonce()
+            "nonce": self.__current_nonce
         }
         print(msg_body)
         return json.dumps(msg_body)
@@ -238,6 +236,17 @@ class Verifier(Server):
 
     def generate_nonce(self):
         return uuid.uuid4().hex
+
+    def __verify_challenge(self, nonce):
+        return nonce == self.__current_nonce
+
+    """" Method to verify that a nonce has not been re-used """
+    def __check_nonce_reuse(self, nonce):
+        if nonce in self.__previous_nonces:
+            return False
+        else:
+            self.__previous_nonces.add(nonce)
+            return True
 
     def run(self):
         self.__mock_session_establishment()
