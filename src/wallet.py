@@ -424,12 +424,19 @@ class Wallet(Client):
         valid_request, requested_attributes = self.__verify_access_policy(permitted_attributes, msg)
         if not valid_request:
             return
+
+        # Ask user if they wish to disclose the requested attributes
+        print("The service wants to request the following attributes:")
         print(requested_attributes)
+        print("Are you willing to disclose these attributes to them? [Y/n]")
+        ans = str(input())
+        if not (ans == "Y" or ans == "y"):
+            return
 
         # Data disclosure
         print("Preparing disclosure of data")
         msg = self.__craft_response_to_data_request(requested_attributes, nonce)
-        packet = self.__prepare_encrypted_packet(msg)
+        packet = self.__prepare_encrypted_packet(pickle.dumps(msg))
         self.send(packet)
 
     def __verify_access_policy(self, permitted_attributes, msg):
@@ -534,4 +541,5 @@ class Wallet(Client):
 
     def run(self):
         self.__mock_session_establishment(13374)
+        self.__presentation_exchange()
         self.__presentation_exchange()

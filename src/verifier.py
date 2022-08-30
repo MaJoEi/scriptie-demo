@@ -141,11 +141,13 @@ class Verifier(Server):
     application, all fields would need to be processed """
     def __process_auth_request(self, msg, nonce):
         if not self.__check_nonce_reuse(nonce):
+            print("Nonce reuse")
             self.interrupt_connection()
             return False
         requested_type = msg["presentation_definition"]["input_descriptors"][0]["constraints"]["fields"][0]["filter"][
             "pattern"]
         if not requested_type == "VerifierAuthorizationCredential":
+            print("Wrong type")
             self.interrupt_connection()
             return False
 
@@ -158,7 +160,20 @@ class Verifier(Server):
         self.send(packet)
 
         # Response to data request
-        # packet = self.receive()
+        packet = self.receive()
+        print("Received response to data request")
+        packet = rsa_crypto.decrypt_blob(packet, self.__private_key.read_bytes())
+        msg, sign = pickle.loads(packet)
+        if not self.__verify_packet(msg, sign):
+            return
+        msg = json.loads(pickle.loads(msg))
+        nonce = msg["nonce"]
+        if not self.__check_nonce_reuse(nonce):
+            return
+        attribute_values = self.__obtain_attribute_values(msg)
+        print("The verifier received the following data for the requested attributes:")
+        print(attribute_values)
+
 
     """ Prepares the data request in the form of a (mocked) OpenID Authorization Request """
     def __prepare_data_request(self, permitted_attributes, challenge):
@@ -213,26 +228,15 @@ class Verifier(Server):
         print(msg_body)
         return json.dumps(msg_body)
 
-    """ Util function that returns a dictionary which lists for each credential type which attributes may be
-     requested """
-    #def __group_attributes_by_credential(self, attributes):
-    #    credential_types = []
-    #    for a in attributes:
-    #        a = a.split(".")
-    #        if not a[0] in credential_types:
-    #            credential_types.append(a[0])
-    #    grouped_attributes = {}
-    #    for c in credential_types:
-    #        corresponding_attributes = []
-    #        for a in attributes:
-    #            a = a.split(".")
-    #            if a[0] == c and not a[1] in corresponding_attributes:
-    #                corresponding_attributes.append(a[1])
-    #        entry = {
-    #            c: corresponding_attributes
-    #        }
-    #        grouped_attributes.update(entry)
-    #    return credential_types, grouped_attributes
+    def __obtain_attribute_values(self, msg):
+        attr_value_dict = {}
+        vcs = msg['vp_token']['verifiableCredential']
+        for vc in vcs:
+            credential_type = vc['type'][1]
+            for a in vc['credentialSubject']:
+                attr = f"{credential_type}.{a}"
+                attr_value_dict.update({attr: vc['credentialSubject'][a]})
+        return attr_value_dict
 
     def generate_nonce(self):
         return uuid.uuid4().hex
@@ -253,4 +257,7 @@ class Verifier(Server):
         f = open(f'{self.directory}/decision_models/contextIDs.json').read()
         context_id = json.loads(f)["notaris"]["id"]
         description = json.loads(f)["notaris"]["description"]
+        self.__presentation_exchange(context_id, description)
+        context_id = json.loads(f)["app_form"]["id"]
+        description = json.loads(f)["app_form"]["description"]
         self.__presentation_exchange(context_id, description)
