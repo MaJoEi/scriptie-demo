@@ -162,7 +162,7 @@ class Verifier(Server):
 
     """ Prepares the data request in the form of a (mocked) OpenID Authorization Request """
     def __prepare_data_request(self, permitted_attributes, challenge):
-        credential_types, attribute_dict = self.__group_attributes_by_credential(sorted(permitted_attributes))
+        credential_types, attribute_dict = ssi_util.group_attributes_by_credential(sorted(permitted_attributes))
         input_descriptors = []
         self.__current_nonce = self.generate_nonce()
         for c in credential_types:
@@ -215,24 +215,24 @@ class Verifier(Server):
 
     """ Util function that returns a dictionary which lists for each credential type which attributes may be
      requested """
-    def __group_attributes_by_credential(self, attributes):
-        credential_types = []
-        for a in attributes:
-            a = a.split(".")
-            if not a[0] in credential_types:
-                credential_types.append(a[0])
-        grouped_attributes = {}
-        for c in credential_types:
-            corresponding_attributes = []
-            for a in attributes:
-                a = a.split(".")
-                if a[0] == c and not a[1] in corresponding_attributes:
-                    corresponding_attributes.append(a[1])
-            entry = {
-                c: corresponding_attributes
-            }
-            grouped_attributes.update(entry)
-        return credential_types, grouped_attributes
+    #def __group_attributes_by_credential(self, attributes):
+    #    credential_types = []
+    #    for a in attributes:
+    #        a = a.split(".")
+    #        if not a[0] in credential_types:
+    #            credential_types.append(a[0])
+    #    grouped_attributes = {}
+    #    for c in credential_types:
+    #        corresponding_attributes = []
+    #        for a in attributes:
+    #            a = a.split(".")
+    #            if a[0] == c and not a[1] in corresponding_attributes:
+    #                corresponding_attributes.append(a[1])
+    #        entry = {
+    #            c: corresponding_attributes
+    #        }
+    #        grouped_attributes.update(entry)
+    #    return credential_types, grouped_attributes
 
     def generate_nonce(self):
         return uuid.uuid4().hex
@@ -251,6 +251,6 @@ class Verifier(Server):
     def run(self):
         self.__mock_session_establishment()
         f = open(f'{self.directory}/decision_models/contextIDs.json').read()
-        context_id = json.loads(f)["app_form"]["id"]
-        description = json.loads(f)["app_form"]["description"]
+        context_id = json.loads(f)["notaris"]["id"]
+        description = json.loads(f)["notaris"]["description"]
         self.__presentation_exchange(context_id, description)

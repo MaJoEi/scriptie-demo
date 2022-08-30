@@ -427,7 +427,10 @@ class Wallet(Client):
         print(requested_attributes)
 
         # Data disclosure
-        
+        print("Preparing disclosure of data")
+        msg = self.__craft_response_to_data_request(requested_attributes, nonce)
+        packet = self.__prepare_encrypted_packet(msg)
+        self.send(packet)
 
     def __verify_access_policy(self, permitted_attributes, msg):
         data_request = msg['presentation_definition']['input_descriptors']
@@ -446,6 +449,73 @@ class Wallet(Client):
                     else:
                         requested_attributes.add(attribute)
         return True, requested_attributes
+
+    def __craft_response_to_data_request(self, requested_attributes, nonce):
+        # Create a verifiable presentation
+        vcs = []
+        credential_type, grouped_attributes = ssi_util.group_attributes_by_credential(requested_attributes)
+        for credential in credential_type:
+            file = open(f'{self.directory}/mock_credentials/{credential}.json')
+            vc = json.loads(file.read())
+            file.close()
+            credential_subject = {}
+            attributes_to_delete = []
+            for attribute in vc['credentialSubject']:
+                if attribute not in grouped_attributes[credential]:
+                    attributes_to_delete.append(attribute)
+            for a in attributes_to_delete:
+                del vc['credentialSubject'][a]
+            vcs.append(vc)
+        vp_token = {
+            "@context": [
+                "https://www.w3.org/2018/credentials/v1"
+            ],
+            "type": [
+                "VerifiablePresentation"
+            ],
+            "verifiableCredential": vcs,
+            "id": "ebc6f1c2",
+            "holder": self.public_did,
+            "proof": {
+                "type": "RsaSignature2018",
+                "created": "2021-03-19T15:30:15Z",
+                "challenge": "n-0S6_WzA2Mj",
+                "domain": "https://client.example.org/cb",
+                "jws": "eyJhbGciOiJFZERTQSIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19..GF5Z6TamgNE8QjE3RbiDOj3n_t25_1K7NVWMUASe_OEzQV63GaKdu235MCS3hIYvepcNdQ_ZOKpGNCf0vIAoDA",
+                "proofPurpose": "authentication",
+                "verificationMethod": "did:example:holder#key-1"
+            }
+        }
+
+        # Create the descriptor map for the presentation_submission parameter of the response
+        descriptor_map = []
+        for c in credential_type:
+            d = {
+                "id": f"{c} with constraints",
+                "format": "ldp_vp",
+                "path": "$",
+                "path_nested": {
+                    "format": "ldp_vc",
+                    "path": f"$.verifiableCredential[{credential_type.index(c)}]"
+                }
+            }
+            descriptor_map.append(d)
+
+        # Create the body of the authorization response
+        msg_body = {
+            "client_id": "https://client.example.org/post",
+            "redirect_uris": ["https://client.example.org/post"],
+            "response_types": "vp_token",
+            "response_mode": "post",
+            "presentation_submission": {
+                "id": "Verifier Authorization Credential example presentation",
+                "definition_id": "Verifier Authorization Credential example",
+                "descriptor_map": descriptor_map
+            },
+            "vp_token": vp_token,
+            "nonce": nonce
+        }
+        return json.dumps(msg_body)
 
     def generate_nonce(self):
         return uuid.uuid4().hex

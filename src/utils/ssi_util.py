@@ -9,7 +9,6 @@ import uuid
 For functions involving DIDs and VCs (whenever not mocked), we utilize REST APIs from walt.id's SSI Kit (primarily the 
 Custodian API)"""
 
-
 # Creates a keypair with an alias via the walt.id Custodian API
 """def create_and_export_keypair(oid):
     # Creation of the key pair
@@ -141,3 +140,23 @@ def create_auth_cert(issuer_did, subject_did, context_id, description):
     }
     auth_cert = json.dumps(schema)
     return auth_cert
+
+
+def group_attributes_by_credential(attributes):
+    credential_types = []
+    for a in attributes:
+        a = a.split(".")
+        if not a[0] in credential_types:
+            credential_types.append(a[0])
+    grouped_attributes = {}
+    for c in credential_types:
+        corresponding_attributes = []
+        for a in attributes:
+            a = a.split(".")
+            if a[0] == c and not a[1] in corresponding_attributes:
+                corresponding_attributes.append(a[1])
+        entry = {
+            c: corresponding_attributes
+        }
+        grouped_attributes.update(entry)
+    return credential_types, grouped_attributes
