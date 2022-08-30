@@ -2,7 +2,8 @@ import json
 import os
 import pickle
 import threading
-from utils import ssi_util, rsa_crypto
+from utils import ssi_util, rsa_crypto, json_util
+from utils.json_util import PythonObjectEncoder, as_python_object
 from utils.server import Server
 from pathlib import Path
 import uuid
@@ -79,8 +80,8 @@ class Verifier(Server):
         print("Generating auth certificate")
         authorizer_did = ssi_util.create_random_did()
         auth_cert = json.loads(ssi_util.create_auth_cert(authorizer_did, self.public_did, context_id, description))
-        self.present_auth_certificate(auth_cert)
-        self.data_request()
+        permitted_attributes = self.present_auth_certificate(auth_cert)
+        self.data_request(permitted_attributes)
 
     """ Method to model the first part of the presentation exchange, where the verifier presents their authorization 
     certificate for the context of the transaction to the wallet which in turn computes which attributes the verifier 
@@ -102,6 +103,21 @@ class Verifier(Server):
         msg = self.prepare_presentation_auth_cert(nonce, auth_cert)
         packet = self.prepare_encrypted_packet(pickle.dumps(msg))
         self.send(packet)
+
+        # Message 3
+        packet = self.receive()
+        print("Received message 3")
+        packet = rsa_crypto.decrypt_blob(packet, self.__private_key.read_bytes())
+        msg, sign = pickle.loads(packet)
+        if not self.verify_packet(msg, sign):
+            return
+        msg = json.loads(pickle.loads(msg), object_hook=as_python_object)
+        nonce = msg["nonce"]
+        if not self.nonce_verification(nonce):
+            return
+        permitted_attributes = msg["permitted_attributes"]
+        return permitted_attributes
+        print(permitted_attributes)
 
     """" Generates a message to disclose a contextual authorization certificate.
          This message is modeled after the authentication response message of the OpenID for Verifiable Presentations 
@@ -142,7 +158,7 @@ class Verifier(Server):
             return False
 
     """ Method to model the second part of the presentation exchange, i.e. the "actual" presentation exchange """
-    def data_request(self):
+    def data_request(self, permitted_attributes):
         pass
 
     def generate_nonce(self):

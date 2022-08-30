@@ -4,10 +4,11 @@ import pickle
 import threading
 import uuid
 
-from utils import rsa_crypto, ssi_util
+from utils import rsa_crypto, ssi_util, json_util
 from utils.client import Client
 from pathlib import Path
 from Cryptodome.PublicKey import RSA
+from utils.json_util import PythonObjectEncoder
 
 
 class Wallet(Client):
@@ -70,8 +71,8 @@ class Wallet(Client):
 
     # "Super"-method to model the proposed extended presentation exchange with contextual access permissions
     def presentation_exchange(self):
-        self.determine_access_permissions()
-        self.process_data_request()
+        permitted_attributes = self.determine_access_permissions()
+        self.process_data_request(permitted_attributes)
 
     """ Method to model the first part of the presentation exchange, where the verifier presents their authorization 
         certificate for the context of the transaction to the wallet which in turn computes which attributes the 
@@ -99,7 +100,24 @@ class Wallet(Client):
         dec_model_file.close()
         if not dec_model["contextID"] == context_id:
             return
+
+        # Evaluation of the decision model
         permitted_attributes = self.evaluate_decision_model(dec_model)
+
+        # Returning the result to the verifier
+        print("Preparing message 3")
+        self.__current_nonce = self.generate_nonce()
+        msg_body= {
+            "response_type": "mock",
+            "client_id": "https://client.example.org/",
+            "redirect_uri": "https://client.example.org/",
+            "permitted_attributes": permitted_attributes,
+            "nonce": self.__current_nonce
+        }
+        msg = json.dumps(msg_body, cls=PythonObjectEncoder)
+        packet = self.prepare_encrypted_packet(pickle.dumps(msg))
+        self.send(packet)
+        return permitted_attributes
 
     """" Generates a message to request the disclosure of a contextual authorization certificate.
      This message is modeled after the authentication request message of the OpenID for Verifiable Presentations 
@@ -380,7 +398,7 @@ class Wallet(Client):
         return -1
 
     """ Method to model the second part of the presentation exchange, i.e. the "actual" presentation exchange """
-    def process_data_request(self):
+    def process_data_request(self, permitted_attributes):
         pass
 
     def generate_nonce(self):
