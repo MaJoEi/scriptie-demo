@@ -34,3 +34,6 @@ class Server(threading.Thread):
         self.conn.close()
         print("Interrupted")
         return 0
+
+    def error_state(self, error):
+        pass

@@ -176,24 +176,31 @@ class Wallet(Client):
 
     def __process_auth_cert(self, msg):
         if not self.__verify_challenge(msg["nonce"]):
-            sys.stderr.write("NonceError: Challenge was not returned correctly")
+            err = "NonceError: Challenge was not returned correctly"
+            sys.stderr.write(err)
+            self.log_event(f"{err} (Verifier: {self.server_did})")
             return
         cert_subject = msg['vp_token']['credentialSubject']['id']
         if not cert_subject == self.server_did:
-            sys.stderr.write("Deception detected: Service provided authorization certificate that was not issued "
-                             "to them")
+            err = "Deception detected: Service provided authorization certificate that was not issued to them"
+            sys.stderr.write(err)
+            self.log_event(f"{err} (Verifier: {self.server_did})")
             return
         context_id = msg['vp_token']['credentialSubject']['context']['contextID']
         dec_model_uri = msg['vp_token']['credentialSubject']['context']['decisionModel']
         if not context_id == dec_model_uri[(len(dec_model_uri) - len(str(context_id))):]:
-            sys.stderr.write("ContextID does not match decision model. Certificate has possibly been manipulated")
+            err = "ContextID does not match decision model. Certificate has possibly been manipulated"
+            sys.stderr.write(err)
+            self.log_event(f"{err} (Verifier: {self.server_did})")
             return
         description = msg['vp_token']['credentialSubject']['context']['description']
         print(f"The services claims that the purpose of this transaction is the following:\n\n{description}\n\nIs this "
               f"accurate? [Y/n]")
         ans = str(input())
         if not (ans == "Y" or ans == "y"):
-            sys.stderr.write("ContextError: Service provided incorrect authorization certificate")
+            err = "ContextError: Service provided incorrect authorization certificate"
+            sys.stderr.write(err)
+            self.log_event(f"{err} (Verifier: {self.server_did})")
             return
         print("Authorization certificate processed successfully")
         return context_id
@@ -426,16 +433,22 @@ class Wallet(Client):
         packet = rsa_crypto.decrypt_blob(packet, self.__private_key.read_bytes())
         msg, sign = pickle.loads(packet)
         if not self.__verify_packet(msg, sign):
-            sys.stderr.write("Message is invalid due to an invalid signature")
+            err = "Message is invalid due to an invalid signature"
+            sys.stderr.write(err)
+            self.log_event(f"{err} (Verifier: {self.server_did})")
             return
         msg = json.loads(pickle.loads(msg))
         nonce = msg["nonce"]
         if not self.__verify_challenge(msg["nonce_challenge"]) or not self.__check_nonce_reuse(nonce):
-            sys.stderr.write("Nonce error: either nonce has been reused or challenge was not returned correctly")
+            err = "Nonce error: either nonce has been reused or challenge was not returned correctly"
+            sys.stderr.write(err)
+            self.log_event(f"{err} (Verifier: {self.server_did})")
             return
         valid_request, requested_attributes = self.__verify_access_policy(permitted_attributes, msg)
         if not valid_request:
-            sys.stderr.write("Access policy violation: unauthorized attributes requested")
+            err = "Access policy violation: unauthorized attributes requested"
+            sys.stderr.write(err)
+            self.log_event(f"{err} (Verifier: {self.server_did})")
             return
 
         # Ask user if they wish to disclose the requested attributes
