@@ -62,7 +62,7 @@ class Wallet(Client):
 
     def __error_state(self, err):
         sys.stderr.write(f"{err}\n")
-        self.log_event(f"{err} (Verifier: {self.server_did})")
+        self.log_event(f"{err}\n(Verifier: {self.server_did})\n\n")
         self.__abort = True
         msg = self.__create_error_message(err)
         packet = self.__prepare_encrypted_packet(pickle.dumps(msg))
