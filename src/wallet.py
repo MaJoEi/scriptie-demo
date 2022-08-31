@@ -1,6 +1,7 @@
 import json
 import os
 import pickle
+import sys
 import threading
 import uuid
 
@@ -43,7 +44,6 @@ class Wallet(Client):
     # Utility method to verify the validity of a message signature
     def __verify_packet(self, msg, sign):
         if not rsa_crypto.verify(msg, sign, self.server_pub_key.read_bytes()):
-            self.interrupt_connection()
             return False
         return True
 
@@ -57,6 +57,7 @@ class Wallet(Client):
         msg, sign = pickle.loads(packet)
         self.server_pub_key = pickle.loads(msg)
         if not self.__verify_packet(msg, sign):
+            sys.stderr.write("Message is invalid due to an invalid signature")
             return
         print("Preparing message 0.2")
         msg = pickle.dumps((self.public_key, self.public_did))
@@ -67,6 +68,7 @@ class Wallet(Client):
         packet = rsa_crypto.decrypt_blob(packet, self.__private_key.read_bytes())
         msg, sign = pickle.loads(packet)
         if not self.__verify_packet(msg, sign):
+            sys.stderr.write("Message is invalid due to an invalid signature")
             return
         self.server_did = pickle.loads(msg)
         print("Session established successfully")
@@ -93,6 +95,7 @@ class Wallet(Client):
         packet = rsa_crypto.decrypt_blob(packet, self.__private_key.read_bytes())
         msg, sign = pickle.loads(packet)
         if not self.__verify_packet(msg, sign):
+            sys.stderr.write("Message is invalid due to an invalid signature")
             return
         msg = json.loads(pickle.loads(msg))
         context_id = self.__process_auth_cert(msg)
@@ -102,6 +105,8 @@ class Wallet(Client):
         dec_model = json.loads(dec_model_file.read())
         dec_model_file.close()
         if not dec_model["contextID"] == context_id:
+            sys.stderr.write("ContextID of decision model does not match contextID provided in authorization "
+                             "certificate. Certificate or decision model has possibly been manipulated.")
             return
 
         # Evaluation of the decision model
@@ -171,19 +176,24 @@ class Wallet(Client):
 
     def __process_auth_cert(self, msg):
         if not self.__verify_challenge(msg["nonce"]):
+            sys.stderr.write("NonceError: Challenge was not returned correctly")
             return
         cert_subject = msg['vp_token']['credentialSubject']['id']
         if not cert_subject == self.server_did:
+            sys.stderr.write("Deception detected: Service provided authorization certificate that was not issued "
+                             "to them")
             return
         context_id = msg['vp_token']['credentialSubject']['context']['contextID']
         dec_model_uri = msg['vp_token']['credentialSubject']['context']['decisionModel']
         if not context_id == dec_model_uri[(len(dec_model_uri) - len(str(context_id))):]:
+            sys.stderr.write("ContextID does not match decision model. Certificate has possibly been manipulated")
             return
         description = msg['vp_token']['credentialSubject']['context']['description']
         print(f"The services claims that the purpose of this transaction is the following:\n\n{description}\n\nIs this "
               f"accurate? [Y/n]")
         ans = str(input())
         if not (ans == "Y" or ans == "y"):
+            sys.stderr.write("ContextError: Service provided incorrect authorization certificate")
             return
         print("Authorization certificate processed successfully")
         return context_id
@@ -416,13 +426,16 @@ class Wallet(Client):
         packet = rsa_crypto.decrypt_blob(packet, self.__private_key.read_bytes())
         msg, sign = pickle.loads(packet)
         if not self.__verify_packet(msg, sign):
+            sys.stderr.write("Message is invalid due to an invalid signature")
             return
         msg = json.loads(pickle.loads(msg))
         nonce = msg["nonce"]
         if not self.__verify_challenge(msg["nonce_challenge"]) or not self.__check_nonce_reuse(nonce):
+            sys.stderr.write("Nonce error: either nonce has been reused or challenge was not returned correctly")
             return
         valid_request, requested_attributes = self.__verify_access_policy(permitted_attributes, msg)
         if not valid_request:
+            sys.stderr.write("Access policy violation: unauthorized attributes requested")
             return
 
         # Ask user if they wish to disclose the requested attributes
@@ -431,6 +444,7 @@ class Wallet(Client):
         print("Are you willing to disclose these attributes to them? [Y/n]")
         ans = str(input())
         if not (ans == "Y" or ans == "y"):
+            sys.stderr.write("User is not willing to disclose the requested attributes")
             return
 
         # Data disclosure

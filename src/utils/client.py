@@ -31,3 +31,6 @@ class Client(threading.Thread):
         self.s.send(message.encode())
         #self.s.close()
 
+    def error(self):
+        pass
+

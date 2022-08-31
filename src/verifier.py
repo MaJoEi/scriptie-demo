@@ -7,6 +7,7 @@ from utils.json_util import PythonObjectEncoder, as_python_object
 from utils.server import Server
 from pathlib import Path
 import uuid
+import sys
 
 
 class Verifier(Server):
@@ -43,8 +44,6 @@ class Verifier(Server):
     # Utility method to verify the validity of a message signature
     def __verify_packet(self, msg, sign):
         if not rsa_crypto.verify(msg, sign, self.client_pub_key.read_bytes()):
-            self.send('interrupt')
-            self.interrupt_connection()
             return False
         return True
 
@@ -86,6 +85,7 @@ class Verifier(Server):
         packet = rsa_crypto.decrypt_blob(packet, self.__private_key.read_bytes())
         msg, sign = pickle.loads(packet)
         if not self.__verify_packet(msg, sign):
+            sys.stderr.write("Message is invalid due to an invalid signature")
             return
         msg = json.loads(pickle.loads(msg))
         nonce = msg["nonce"]
@@ -103,10 +103,12 @@ class Verifier(Server):
         packet = rsa_crypto.decrypt_blob(packet, self.__private_key.read_bytes())
         msg, sign = pickle.loads(packet)
         if not self.__verify_packet(msg, sign):
+            sys.stderr.write("Message is invalid due to an invalid signature")
             return
         msg = json.loads(pickle.loads(msg), object_hook=as_python_object)
         nonce = msg["nonce"]
         if not self.__check_nonce_reuse(nonce):
+            sys.stderr.write("Nonce reuse detected")
             return
         permitted_attributes = msg["permitted_attributes"]
         return permitted_attributes, nonce
@@ -141,14 +143,13 @@ class Verifier(Server):
     application, all fields would need to be processed """
     def __process_auth_request(self, msg, nonce):
         if not self.__check_nonce_reuse(nonce):
-            print("Nonce reuse")
-            self.interrupt_connection()
+            sys.stderr.write("Nonce reuse detected")
             return False
         requested_type = msg["presentation_definition"]["input_descriptors"][0]["constraints"]["fields"][0]["filter"][
             "pattern"]
         if not requested_type == "VerifierAuthorizationCredential":
-            print("Wrong type")
-            self.interrupt_connection()
+            sys.stderr.write(f"Unexpected credential type requested. Expected VerifierAuthorizationCredential, got "
+                             f"{requested_type} instead")
             return False
 
     """ Method to model the second part of the presentation exchange, i.e. the "actual" presentation exchange """
@@ -165,15 +166,16 @@ class Verifier(Server):
         packet = rsa_crypto.decrypt_blob(packet, self.__private_key.read_bytes())
         msg, sign = pickle.loads(packet)
         if not self.__verify_packet(msg, sign):
+            sys.stderr.write("Message is invalid due to an invalid signature")
             return
         msg = json.loads(pickle.loads(msg))
         nonce = msg["nonce"]
         if not self.__check_nonce_reuse(nonce):
+            sys.stderr.write("Nonce reuse detected")
             return
         attribute_values = self.__obtain_attribute_values(msg)
         print("The verifier received the following data for the requested attributes:")
         print(attribute_values)
-
 
     """ Prepares the data request in the form of a (mocked) OpenID Authorization Request """
     def __prepare_data_request(self, permitted_attributes, challenge):
