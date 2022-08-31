@@ -27,6 +27,7 @@ class Wallet(Client):
         self.server_did = None
         self.__current_nonce = 0
         self.__previous_nonces = set()
+        self.__abort = False
 
     # Utility method to sign a message and create an encrypted package containing the message and its signature
     def __prepare_encrypted_packet(self, msg):
@@ -46,6 +47,35 @@ class Wallet(Client):
         if not rsa_crypto.verify(msg, sign, self.server_pub_key.read_bytes()):
             return False
         return True
+
+    # Utility method to create an error message in OIDC format to be sent to the verifier in case of an exception
+    def __create_error_message(self, msg):
+        self.__current_nonce = self.generate_nonce()
+        msg_body = {
+            "response_type": "error",
+            "client_id": "https://client.example.org/",
+            "redirect_uri": "https://client.example.org/",
+            "error_message": msg,
+            "nonce": self.__current_nonce
+        }
+        return json.dumps(msg_body)
+
+    def __error_state(self, err):
+        sys.stderr.write(f"{err}\n")
+        self.log_event(f"{err} (Verifier: {self.server_did})")
+        self.__abort = True
+        msg = self.__create_error_message(err)
+        packet = self.__prepare_encrypted_packet(pickle.dumps(msg))
+        self.send(packet)
+
+    def __check_error(self, msg):
+        if msg["response_type"] == "error":
+            sys.stderr.write("The verifier aborted the interaction for the following reason:\n")
+            sys.stderr.write(msg["error_message"])
+            sys.stderr.write("\n")
+            self.__abort = True
+            return True
+        return False
 
     """ Mocked session establishment where wallet and verifier share identifiers and cryptographic keys 
     This does not resemble a 'real' session establishment process like the DIDComm or OIDC variants """
@@ -76,6 +106,8 @@ class Wallet(Client):
     # "Super"-method to model the proposed extended presentation exchange with contextual access permissions
     def __presentation_exchange(self):
         permitted_attributes = self.__determine_access_permissions()
+        if self.__abort:
+            return
         self.__data_request(permitted_attributes)
 
     """ Method to model the first part of the presentation exchange, where the verifier presents their authorization 
@@ -95,19 +127,25 @@ class Wallet(Client):
         packet = rsa_crypto.decrypt_blob(packet, self.__private_key.read_bytes())
         msg, sign = pickle.loads(packet)
         if not self.__verify_packet(msg, sign):
-            sys.stderr.write("Message is invalid due to an invalid signature")
-            return
+            err = "Message is invalid due to an invalid signature"
+            self.__error_state(err)
+            return None
         msg = json.loads(pickle.loads(msg))
+        if self.__check_error(msg):
+            return None
         context_id = self.__process_auth_cert(msg)
+        if self.__abort:
+            return None
 
         # Obtaining of the decision model is mocked here
         dec_model_file = open(f'{self.directory}/decision_models/{context_id}.json')
         dec_model = json.loads(dec_model_file.read())
         dec_model_file.close()
         if not dec_model["contextID"] == context_id:
-            sys.stderr.write("ContextID of decision model does not match contextID provided in authorization "
-                             "certificate. Certificate or decision model has possibly been manipulated.")
-            return
+            err = "ContextID of decision model does not match contextID provided in authorization certificate. " \
+                  "Certificate or decision model has possibly been manipulated."
+            self.__error_state(err)
+            return None
 
         # Evaluation of the decision model
         permitted_attributes = self.__evaluate_decision_model(dec_model)
@@ -177,31 +215,27 @@ class Wallet(Client):
     def __process_auth_cert(self, msg):
         if not self.__verify_challenge(msg["nonce"]):
             err = "NonceError: Challenge was not returned correctly"
-            sys.stderr.write(err)
-            self.log_event(f"{err} (Verifier: {self.server_did})")
-            return
+            self.__error_state(err)
+            return None
         cert_subject = msg['vp_token']['credentialSubject']['id']
         if not cert_subject == self.server_did:
             err = "Deception detected: Service provided authorization certificate that was not issued to them"
-            sys.stderr.write(err)
-            self.log_event(f"{err} (Verifier: {self.server_did})")
-            return
+            self.__error_state(err)
+            return None
         context_id = msg['vp_token']['credentialSubject']['context']['contextID']
         dec_model_uri = msg['vp_token']['credentialSubject']['context']['decisionModel']
         if not context_id == dec_model_uri[(len(dec_model_uri) - len(str(context_id))):]:
             err = "ContextID does not match decision model. Certificate has possibly been manipulated"
-            sys.stderr.write(err)
-            self.log_event(f"{err} (Verifier: {self.server_did})")
-            return
+            self.__error_state(err)
+            return None
         description = msg['vp_token']['credentialSubject']['context']['description']
         print(f"The services claims that the purpose of this transaction is the following:\n\n{description}\n\nIs this "
               f"accurate? [Y/n]")
         ans = str(input())
         if not (ans == "Y" or ans == "y"):
             err = "ContextError: Service provided incorrect authorization certificate"
-            sys.stderr.write(err)
-            self.log_event(f"{err} (Verifier: {self.server_did})")
-            return
+            self.__error_state(err)
+            return None
         print("Authorization certificate processed successfully")
         return context_id
 
@@ -434,21 +468,20 @@ class Wallet(Client):
         msg, sign = pickle.loads(packet)
         if not self.__verify_packet(msg, sign):
             err = "Message is invalid due to an invalid signature"
-            sys.stderr.write(err)
-            self.log_event(f"{err} (Verifier: {self.server_did})")
+            self.__error_state(err)
             return
         msg = json.loads(pickle.loads(msg))
+        if self.__check_error(msg):
+            return
         nonce = msg["nonce"]
         if not self.__verify_challenge(msg["nonce_challenge"]) or not self.__check_nonce_reuse(nonce):
             err = "Nonce error: either nonce has been reused or challenge was not returned correctly"
-            sys.stderr.write(err)
-            self.log_event(f"{err} (Verifier: {self.server_did})")
+            self.__error_state(err)
             return
         valid_request, requested_attributes = self.__verify_access_policy(permitted_attributes, msg)
         if not valid_request:
             err = "Access policy violation: unauthorized attributes requested"
-            sys.stderr.write(err)
-            self.log_event(f"{err} (Verifier: {self.server_did})")
+            self.__error_state(err)
             return
 
         # Ask user if they wish to disclose the requested attributes
@@ -457,7 +490,7 @@ class Wallet(Client):
         print("Are you willing to disclose these attributes to them? [Y/n]")
         ans = str(input())
         if not (ans == "Y" or ans == "y"):
-            sys.stderr.write("User is not willing to disclose the requested attributes")
+            self.__error_state("User is not willing to disclose the requested attributes")
             return
 
         # Data disclosure
@@ -539,7 +572,7 @@ class Wallet(Client):
         msg_body = {
             "client_id": "https://client.example.org/post",
             "redirect_uris": ["https://client.example.org/post"],
-            "response_types": "vp_token",
+            "response_type": "vp_token",
             "response_mode": "post",
             "presentation_submission": {
                 "id": "Verifier Authorization Credential example presentation",

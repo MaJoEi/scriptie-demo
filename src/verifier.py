@@ -27,6 +27,7 @@ class Verifier(Server):
         self.client_did = None
         self.__previous_nonces = set()
         self.__current_nonce = 0
+        self.__abort = False
 
     # Utility method to sign a message and create an encrypted package containing the message and its signature
     def __prepare_encrypted_packet(self, msg):
@@ -46,6 +47,34 @@ class Verifier(Server):
         if not rsa_crypto.verify(msg, sign, self.client_pub_key.read_bytes()):
             return False
         return True
+
+    # Utility method to create an error message in OIDC format to be sent to the verifier in case of an exception
+    def __create_error_message(self, msg):
+        self.__current_nonce = self.generate_nonce()
+        msg_body = {
+            "response_type": "error",
+            "client_id": "https://client.example.org/",
+            "redirect_uri": "https://client.example.org/",
+            "error_message": msg,
+            "nonce": self.__current_nonce
+        }
+        return json.dumps(msg_body)
+
+    def __error_state(self, err):
+        sys.stderr.write(f"{err}\n")
+        self.__abort = True
+        msg = self.__create_error_message(err)
+        packet = self.__prepare_encrypted_packet(pickle.dumps(msg))
+        self.send(packet)
+
+    def __check_error(self, msg):
+        if msg["response_type"] == "error":
+            sys.stderr.write("The wallet aborted the interaction for the following reason:\n")
+            sys.stderr.write(msg["error_message"])
+            sys.stderr.write("\n")
+            self.__abort = True
+            return True
+        return False
 
     """ Mocked session establishment where wallet and verifier share identifiers and cryptographic keys 
         This does not resemble a 'real' session establishment process like the DIDComm or OIDC variants """
@@ -73,6 +102,8 @@ class Verifier(Server):
         authorizer_did = ssi_util.create_random_did()
         auth_cert = json.loads(ssi_util.create_auth_cert(authorizer_did, self.public_did, context_id, description))
         permitted_attributes, challenge = self.__present_auth_certificate(auth_cert)
+        if self.__abort:
+            return
         self.__data_request(permitted_attributes, challenge)
 
     """ Method to model the first part of the presentation exchange, where the verifier presents their authorization 
@@ -85,9 +116,11 @@ class Verifier(Server):
         packet = rsa_crypto.decrypt_blob(packet, self.__private_key.read_bytes())
         msg, sign = pickle.loads(packet)
         if not self.__verify_packet(msg, sign):
-            sys.stderr.write("Message is invalid due to an invalid signature")
-            return
+            self.__error_state("Message is invalid due to an invalid signature")
+            return None, None
         msg = json.loads(pickle.loads(msg))
+        if self.__check_error(msg):
+            return None, None
         nonce = msg["nonce"]
         self.__process_auth_request(msg, nonce)
 
@@ -103,13 +136,15 @@ class Verifier(Server):
         packet = rsa_crypto.decrypt_blob(packet, self.__private_key.read_bytes())
         msg, sign = pickle.loads(packet)
         if not self.__verify_packet(msg, sign):
-            sys.stderr.write("Message is invalid due to an invalid signature")
-            return
+            self.__error_state("Message is invalid due to an invalid signature")
+            return None, None
         msg = json.loads(pickle.loads(msg), object_hook=as_python_object)
+        if self.__check_error(msg):
+            return None, None
         nonce = msg["nonce"]
         if not self.__check_nonce_reuse(nonce):
-            sys.stderr.write("Nonce reuse detected")
-            return
+            self.__error_state("Nonce reuse detected")
+            return None, None
         permitted_attributes = msg["permitted_attributes"]
         return permitted_attributes, nonce
 
@@ -120,7 +155,7 @@ class Verifier(Server):
         msg_body = {
             "client_id": "https://client.example.org/post",
             "redirect_uris": ["https://client.example.org/post"],
-            "response_types": "vp_token",
+            "response_type": "vp_token",
             "response_mode": "post",
             "presentation_submission": {
                 "id": "Verifier Authorization Credential example presentation",
@@ -143,13 +178,13 @@ class Verifier(Server):
     application, all fields would need to be processed """
     def __process_auth_request(self, msg, nonce):
         if not self.__check_nonce_reuse(nonce):
-            sys.stderr.write("Nonce reuse detected")
+            self.__error_state("Nonce reuse detected")
             return False
         requested_type = msg["presentation_definition"]["input_descriptors"][0]["constraints"]["fields"][0]["filter"][
             "pattern"]
         if not requested_type == "VerifierAuthorizationCredential":
-            sys.stderr.write(f"Unexpected credential type requested. Expected VerifierAuthorizationCredential, got "
-                             f"{requested_type} instead")
+            self.__error_state(f"Unexpected credential type requested. Expected VerifierAuthorizationCredential, got "
+                               f"{requested_type} instead")
             return False
 
     """ Method to model the second part of the presentation exchange, i.e. the "actual" presentation exchange """
@@ -169,6 +204,8 @@ class Verifier(Server):
             sys.stderr.write("Message is invalid due to an invalid signature")
             return
         msg = json.loads(pickle.loads(msg))
+        if self.__check_error(msg):
+            return
         nonce = msg["nonce"]
         if not self.__check_nonce_reuse(nonce):
             sys.stderr.write("Nonce reuse detected")

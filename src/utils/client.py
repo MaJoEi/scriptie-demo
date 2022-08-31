@@ -1,3 +1,4 @@
+import os
 import socket
 import pickle
 import threading
@@ -33,13 +34,11 @@ class Client(threading.Thread):
         self.s.send(message.encode())
         #self.s.close()
 
-    def error_state(self, error):
-        pass
-
     def log_event(self, msg):
+        directory = os.path.dirname(__file__)
         date = datetime.today().strftime('%Y-%m-%d')
         t = time.localtime()
         current_time = time.strftime("%H:%M:%S", t)
-        f = open(f"{date}.txt", "a")
+        f = open(f"{directory}/../logs/{date}.txt", "a")
         f.write(f"[{current_time}]: {msg}")
         f.close()
