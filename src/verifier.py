@@ -264,7 +264,6 @@ class Verifier(Server):
             "nonce_challenge": challenge,
             "nonce": self.__current_nonce
         }
-        print(msg_body)
         return json.dumps(msg_body)
 
     def __obtain_attribute_values(self, msg):
