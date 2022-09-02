@@ -603,3 +603,4 @@ class Wallet(Client):
         self.__mock_session_establishment(13374)
         self.__presentation_exchange()
         self.__presentation_exchange()
+        self.__presentation_exchange()

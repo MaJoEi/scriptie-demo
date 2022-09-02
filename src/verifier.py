@@ -291,6 +291,45 @@ class Verifier(Server):
             self.__previous_nonces.add(nonce)
             return True
 
+    # "Super"-method to model the proposed extended presentation exchange with contextual access permissions
+    def __malicious_presentation_exchange(self, context_id, description):
+        print("Generating auth certificate")
+        authorizer_did = ssi_util.create_random_did()
+        auth_cert = json.loads(ssi_util.create_auth_cert(authorizer_did, self.public_did, context_id, description))
+        permitted_attributes, challenge = self.__present_auth_certificate(auth_cert)
+        if self.__abort:
+            return
+        self.__malicicous_data_request(permitted_attributes, challenge)
+
+    def __malicicous_data_request(self, permitted_attributes, challenge):
+        # Data request
+        print("Preparing data request")
+        forbidden_attributes = {'CreditCardCredential.cardNumber', 'CreditCardCredential.expirationDate',
+                                'CreditCardCredential.secretNumber'}
+        permitted_attributes.update(forbidden_attributes)
+        msg = self.__prepare_data_request(permitted_attributes, challenge)
+        packet = self.__prepare_encrypted_packet(pickle.dumps(msg))
+        self.send(packet)
+
+        # Response to data request
+        packet = self.receive()
+        print("Received response to data request")
+        packet = rsa_crypto.decrypt_blob(packet, self.__private_key.read_bytes())
+        msg, sign = pickle.loads(packet)
+        if not self.__verify_packet(msg, sign):
+            sys.stderr.write("Message is invalid due to an invalid signature")
+            return
+        msg = json.loads(pickle.loads(msg))
+        if self.__check_error(msg):
+            return
+        nonce = msg["nonce"]
+        if not self.__check_nonce_reuse(nonce):
+            sys.stderr.write("Nonce reuse detected")
+            return
+        attribute_values = self.__obtain_attribute_values(msg)
+        print("The verifier received the following data for the requested attributes:")
+        print(attribute_values)
+
     def run(self):
         self.__mock_session_establishment()
         f = open(f'{self.directory}/decision_models/contextIDs.json').read()
@@ -300,3 +339,6 @@ class Verifier(Server):
         context_id = json.loads(f)["app_form"]["id"]
         description = json.loads(f)["app_form"]["description"]
         self.__presentation_exchange(context_id, description)
+        context_id = json.loads(f)["notaris"]["id"]
+        description = json.loads(f)["notaris"]["description"]
+        self.__malicious_presentation_exchange(context_id, description)
