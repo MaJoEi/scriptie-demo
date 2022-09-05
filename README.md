@@ -14,3 +14,10 @@ To run the program, the following python libraries are required:
 <code>threading</code>
 
 All of these can be installed via <code>pip</code>
+
+Once you've installed all necessary packages, you can run the run the demo by entering the following commands in your command line:
+
+```
+cd src
+python3 main.py
+```
