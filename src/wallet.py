@@ -246,49 +246,40 @@ class Wallet(Client):
         amount_rules = int(dec_model["amount_rules"])
         for x in range(amount_rules):
             rule = dec_model[f"r_{x + 1}"]
-            permitted_attributes.update(self.__process_rule(rule, dec_model))
+            permitted_attributes.update(self.__process_rule(rule))
+        # print(permitted_attributes)
         return permitted_attributes
 
     """ Util method to process a rule predicate """
 
-    def __process_rule(self, rule, dec_model):
-        index_predicate = rule.find('(')
-        predicate = rule[:index_predicate]
-        attributes = rule[index_predicate + 2:rule.find(';') - 1]
-        attributes = attributes.split(', ')
-        condition = rule[rule.find(';') + 2:len(rule) - 1]
+    def __process_rule(self, rule):
+        condition = rule["condition"]
+        if not self.__process_condition(condition):
+            return []
+        access = rule["access_permissions"]
+        predicate = access["predicate"]
+        if not (access["verifier"] == "v") or (access["verifier"] == self.server_did):
+            return []
         match predicate:
             case "mayRequest":
-                return self.__mayRequest(attributes, condition)
+                return access["attributes"]
             case "mayRequestOne":
-                return self.__mayRequestOne(attributes, condition, dec_model)
+                return self.__mayRequestOne(access["attributes"], rule)
             case "mayRequestN":
-                return self.__mayRequestN(attributes, condition, dec_model)
+                return self.__mayRequestN(access["attributes"], rule)
             case _:
-                return
-
-    """ Processes rule predicates of the type 'mayRequest' and returns the set of attribute that may be requested 
-    according to this predicate """
-
-    def __mayRequest(self, attributes, condition):
-        # print(condition)
-        if not condition == "null":
-            if not self.__process_condition(condition):
                 return []
-        return attributes
 
     """ Processes rule predicates of the type 'mayRequestOne' and returns the set of attribute that may be requested 
         according to this predicate """
 
-    def __mayRequestOne(self, attributes, condition, dec_model):
-        if not condition == "null":
-            if not self.__process_condition(condition):
-                return []
+    def __mayRequestOne(self, attributes, rule):
         attr_set = set()
         for attr in attributes:
             if attr.startswith("r_"):
-                rule = dec_model[attr]
-                res = tuple(self.__process_rule(rule, dec_model))
+                sub_rule = rule[attr]
+                print(attr)
+                res = tuple(self.__process_rule(sub_rule))
                 if not res == ():
                     attr_set.add(res)
             else:
@@ -307,16 +298,12 @@ class Wallet(Client):
     """ Processes rule predicates of the type 'mayRequestN' and returns the set of attribute that may be requested 
         according to this predicate """
 
-    def __mayRequestN(self, attributes, condition, dec_model):
-        if not condition == "null":
-            if not self.__process_condition(condition):
-                return []
-
+    def __mayRequestN(self, attributes, rule):
         attr_set = set()
         for attr in attributes:
             if attr.startsWith("r_"):
-                rule = dec_model[attr]
-                res = tuple(self.__process_rule(rule, dec_model))
+                sub_rule = rule[attr]
+                res = tuple(self.__process_rule(sub_rule))
                 if not res == ():
                     attr_set.add(res)
             else:
@@ -345,118 +332,60 @@ class Wallet(Client):
 
     def __process_condition(self, condition):
         result = False
-        atomic_conditions = condition.split(" ")
-        x = 0
-        while x in range(len(atomic_conditions)):
-            # print(atomic_conditions[x])
-            if atomic_conditions[x].startswith("("):
-                y = self.__find_end_statement(atomic_conditions[x + 1:])
-                cond_set = " ".join(atomic_conditions[x:y + 1])
-                cond_set = cond_set[1:len(cond_set) - 1]
-                result = self.__process_condition(cond_set)
-                x = y + 1
-            elif atomic_conditions[x] == "AND":
-                second_condition = atomic_conditions[x + 1]
-                if second_condition.startswith("("):
-                    y = self.__find_end_statement(atomic_conditions[x + 2:])
-                    cond_set = " ".join(atomic_conditions[x + 1:y + 1])
-                    cond_set = cond_set[1:len(cond_set) - 1]
-                    result = result and self.__process_condition(cond_set)
-                    x = y + 1
+        amount = condition["amount"]
+        operators = []
+        if amount == 0:
+            return True
+        elif amount == 1:
+            return self.__process_condition_predicate(condition["c_1"]["predicate"], condition["c_1"]["parameters"])
+        elif amount > 1:
+            results = []
+            operators = condition["operators"]
+            for i in range(amount):
+                cond = condition[f"c_{i + 1}"]
+                if i == 0:
+                    result = self.__process_condition_predicate(cond["predicate"], cond["parameters"])
                 else:
-                    index_predicate = second_condition.find('(')
-                    predicate = second_condition[:index_predicate]
-                    args = second_condition[index_predicate + 1:len(second_condition) - 1].split(",")
-                    attribute = self.__retrieve_attribute_value(args)
-                    match predicate:
-                        case "equals":
-                            result = result and (attribute == args[1])
-                        case "greaterThan":
-                            result = result and (int(attribute) > int(args[1]))
-                        case "lessThan":
-                            result = result and (int(attribute) < int(args[1]))
-                    x += 2
-            elif atomic_conditions[x] == "OR":
-                second_condition = atomic_conditions[x + 1]
-                if second_condition.startswith("("):
-                    y = self.__find_end_statement(atomic_conditions[x + 2:])
-                    cond_set = " ".join(atomic_conditions[x + 1:y + 1])
-                    cond_set = cond_set[1:len(cond_set) - 1]
-                    result = result or self.__process_condition(cond_set)
-                    x = y + 1
-                else:
-                    index_predicate = second_condition.find('(')
-                    predicate = second_condition[:index_predicate]
-                    args = second_condition[index_predicate + 1:len(second_condition) - 1].split(",")
-                    attribute = self.__retrieve_attribute_value(args)
-                    match predicate:
-                        case "equals":
-                            result = result or (attribute == args[1])
-                        case "greaterThan":
-                            result = result or (int(attribute) > int(args[1]))
-                        case "lessThan":
-                            result = result or (int(attribute) < int(args[1]))
-                    x += 2
-            elif atomic_conditions[x] == "XOR":
-                second_condition = atomic_conditions[x + 1]
-                if second_condition.startswith("("):
-                    y = self.__find_end_statement(atomic_conditions[x + 2:])
-                    cond_set = " ".join(atomic_conditions[x + 1:y + 1])
-                    cond_set = cond_set[1:len(cond_set) - 1]
-                    result = result or self.__process_condition(cond_set)
-                    x = y + 1
-                else:
-                    index_predicate = second_condition.find('(')
-                    predicate = second_condition[:index_predicate]
-                    args = second_condition[index_predicate + 1:len(second_condition) - 1].split(",")
-                    attribute = self.__retrieve_attribute_value(args)
-                    match predicate:
-                        case "equals":
-                            result = result ^ (attribute == args[1])
-                        case "greaterThan":
-                            result = result ^ (int(attribute) > int(args[1]))
-                        case "lessThan":
-                            result = result ^ (int(attribute) < int(args[1]))
-                    x += 2
-            else:
-                index_predicate = atomic_conditions[x].find('(')
-                predicate = atomic_conditions[x][:index_predicate]
-                args = atomic_conditions[x][index_predicate + 1:len(atomic_conditions[x]) - 1].split(",")
-                attribute = self.__retrieve_attribute_value(args)
-                match predicate:
-                    case "equals":
-                        result = attribute == args[1]
-                    case "greaterThan":
-                        result = int(attribute) > int(args[1])
-                    case "lessThan":
-                        result = int(attribute) < int(args[1])
-                x += 1
+                    match operators[i - 1]:
+                        case "AND":
+                            result = result and self.__process_condition_predicate(cond["predicate"],
+                                                                                   cond["parameters"])
+                        case "OR":
+                            result = result or self.__process_condition_predicate(cond["predicate"],
+                                                                                  cond["parameters"])
+                        case "XOR":
+                            result = result != self.__process_condition_predicate(cond["predicate"],
+                                                                                  cond["parameters"])
+
         return result
 
-    """ Util method to retrieve the value of a specific attribute from a credential """
+    """Processes a condition predicate and returns the result"""
+    def __process_condition_predicate(self, predicate, parameters):
+        match predicate:
+            case "equals":
+                return self.__retrieve_attribute_value(parameters[0]) == parameters[1]
+            case "greaterThan":
+                return int(self.__retrieve_attribute_value(parameters[0])) > parameters[1]
+            case "lessThan":
+                return int(self.__retrieve_attribute_value(parameters[0])) < parameters[1]
+            case "lessThanOrEquals":
+                return int(self.__retrieve_attribute_value(parameters[0])) <= parameters[1]
+            case "greaterThanOrEquals":
+                return int(self.__retrieve_attribute_value(parameters[0])) >= parameters[1]
+            case _:
+                return True
 
+    """ Util method to retrieve the value of a specific attribute from a credential """
     def __retrieve_attribute_value(self, args):
-        attr = args[0]
-        attr = attr[4:len(attr) - 1].split(".")
-        credential_type = attr[0]
-        attribute_type = attr[1]
+        comps = args.split(".")
+        credential_type = comps[0]
         file = open(f'{self.directory}/mock_credentials/{credential_type}.json')
         credential = json.loads(file.read())
         file.close()
-        return credential["credentialSubject"][attribute_type]
-
-    """ Util method to find out where a statement in parentheses ends """
-
-    def __find_end_statement(self, atoms):
-        expected_p_close = 1
-        for cond in atoms:
-            if cond.startswith("("):
-                expected_p_close += 1
-            elif cond.endswith(")"):
-                expected_p_close -= 1
-                if expected_p_close == 0:
-                    return atoms.index(cond)
-        return -1
+        attribute = credential["credentialSubject"]
+        for i in range(len(comps)-1):
+            attribute = attribute[comps[i+1]]
+        return attribute
 
     """ Method to model the second part of the presentation exchange, i.e. the "classic" presentation exchange """
 
@@ -509,8 +438,10 @@ class Wallet(Client):
                 if not c == credential[0]:
                     attribute_path = c['path'][0]
                     attribute_path = attribute_path.split(".")
-                    attribute = attribute_path[2]
-                    attribute = f"{credential_type}.{attribute}"
+                    attribute = ""
+                    for i in range(2, len(attribute_path)):
+                        attribute = attribute + "." + attribute_path[i]
+                    attribute = f"{credential_type}.{attribute[1:]}"
                     if attribute not in permitted_attributes:
                         return False, set()
                     else:
@@ -527,8 +458,17 @@ class Wallet(Client):
             file.close()
             credential_subject = {}
             attributes_to_delete = []
-            for attribute in vc['credentialSubject']:
-                if attribute not in grouped_attributes[credential]:
+            do_not_delete = []
+            nested_attrs = []
+            for a in grouped_attributes[credential]:
+                if "." in a:
+                    nested_attrs.append(a[:a.find(".")])
+            for a in nested_attrs:
+                for attr in vc["credentialSubject"][a]:
+                    if f"{a}.{attr}" not in grouped_attributes[credential]:
+                        del vc["credentialSubject"][a][attr]
+            for attribute in vc["credentialSubject"]:
+                if (attribute not in grouped_attributes[credential]) and (attribute not in nested_attrs):
                     attributes_to_delete.append(attribute)
             for a in attributes_to_delete:
                 del vc['credentialSubject'][a]
@@ -604,3 +544,15 @@ class Wallet(Client):
         self.__presentation_exchange()
         self.__presentation_exchange()
         self.__presentation_exchange()
+
+# """ Util method to find out where a statement in parentheses ends """
+# def __find_end_statement(self, atoms):
+#    expected_p_close = 1
+#    for cond in atoms:
+#        if cond.startswith("("):
+#            expected_p_close += 1
+#        elif cond.endswith(")"):
+#            expected_p_close -= 1
+#            if expected_p_close == 0:
+#                return atoms.index(cond)
+#    return -1

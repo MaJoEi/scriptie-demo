@@ -212,7 +212,7 @@ class Verifier(Server):
             return
         attribute_values = self.__obtain_attribute_values(msg)
         print("The verifier received the following data for the requested attributes:")
-        print(attribute_values)
+        print(f"{attribute_values}\n")
 
     """ Prepares the data request in the form of a (mocked) OpenID Authorization Request """
     def __prepare_data_request(self, permitted_attributes, challenge):

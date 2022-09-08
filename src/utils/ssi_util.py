@@ -153,8 +153,12 @@ def group_attributes_by_credential(attributes):
         corresponding_attributes = []
         for a in attributes:
             a = a.split(".")
-            if a[0] == c and not a[1] in corresponding_attributes:
-                corresponding_attributes.append(a[1])
+            attr = ""
+            for i in range(1, len(a)):
+                attr = attr + "." + a[i]
+            attr = attr[1:]
+            if (a[0] == c) and (attr not in corresponding_attributes):
+                corresponding_attributes.append(attr)
         entry = {
             c: corresponding_attributes
         }
