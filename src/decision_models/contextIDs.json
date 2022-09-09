@@ -1,7 +1,7 @@
 {
 	"notaris": {
 		"id": "081863fe03ad49e8b6e58e34704e0c67",
-		"description": "Check if whether the bank account holder has passed away and the holder has\nbeen authorized to access the account in their will"
+		"description": "Authorized person accessing the bank account of a recently deceased person"
 	},
 	"app_form": {
 		"id": "bda90835c9fa4617ad86d0ae8c0d3e3f",
