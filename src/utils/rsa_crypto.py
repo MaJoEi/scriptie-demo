@@ -2,6 +2,7 @@
 https://cryptobook.nakov.com/digital-signatures/rsa-sign-verify-examples for the signature functions """
 
 import os
+import sys
 import zlib
 import base64
 from Cryptodome.PublicKey import RSA
@@ -119,7 +120,7 @@ def verify(msg, signature, key):
         print("Signature is valid.")
         return True
     except:
-        print("Signature is invalid.")
+        sys.stderr.write("Signature is invalid.")
         return False
 
 

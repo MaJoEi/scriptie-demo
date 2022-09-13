@@ -3,6 +3,7 @@ import os
 import pickle
 import sys
 import threading
+import time
 import uuid
 
 from utils import rsa_crypto, ssi_util, json_util
@@ -247,7 +248,6 @@ class Wallet(Client):
         for x in range(amount_rules):
             rule = dec_model[f"r_{x + 1}"]
             permitted_attributes.update(self.__process_rule(rule))
-        # print(permitted_attributes)
         return permitted_attributes
 
     """ Util method to process a rule predicate """
@@ -264,72 +264,13 @@ class Wallet(Client):
             case "mayRequest":
                 return access["attributes"]
             case "mayRequestOne":
-                return self.__mayRequestOne(access["attributes"], rule)
+               return self.__mayRequestOne(access["attributes"], rule)
             case "mayRequestN":
-                return self.__mayRequestN(access["attributes"], rule)
+               return self.__mayRequestN(access["attributes"], rule)
             case _:
                 return []
 
-    """ Processes rule predicates of the type 'mayRequestOne' and returns the set of attribute that may be requested 
-        according to this predicate """
-
-    def __mayRequestOne(self, attributes, rule):
-        attr_set = set()
-        for attr in attributes:
-            if attr.startswith("r_"):
-                sub_rule = rule[attr]
-                print(attr)
-                res = tuple(self.__process_rule(sub_rule))
-                if not res == ():
-                    attr_set.add(res)
-            else:
-                attr_set.add(attr)
-        print("The service may request one of the following options. Which one is your preference?")
-        x = 0
-        for a in attr_set:
-            x += 1
-            print(f"{x}: {a}")
-        i = int(input())
-        if i - 1 in range(len(attr_set)):
-            return set(list(attr_set)[i - 1])
-        else:
-            return
-
-    """ Processes rule predicates of the type 'mayRequestN' and returns the set of attribute that may be requested 
-        according to this predicate """
-
-    def __mayRequestN(self, attributes, rule):
-        attr_set = set()
-        for attr in attributes:
-            if attr.startsWith("r_"):
-                sub_rule = rule[attr]
-                res = tuple(self.__process_rule(sub_rule))
-                if not res == ():
-                    attr_set.add(res)
-            else:
-                attr_set.add(attr)
-        print("The service may optionally request one or more of the following options. Which options would you be "
-              "willing to disclose?")
-        print("0: None")
-        x = 0
-        for a in attr_set:
-            x += 1
-            print(f"{x}: {a}")
-        options = input()
-        options = options.split()
-        permitted_attributes = set()
-        for o in options:
-            i = int(o)
-            if i == 0:
-                return set()
-            elif i - 1 in range(len(attr_set)):
-                permitted_attributes.update(list(attr_set)[i - 1])
-            else:
-                return
-        return permitted_attributes
-
     """ Util method to evaluate the condition of a specific rule predicate """
-
     def __process_condition(self, condition):
         result = False
         amount = condition["amount"]
@@ -375,6 +316,61 @@ class Wallet(Client):
             case _:
                 return True
 
+    """ Processes rule predicates of the type 'mayRequestOne' and returns the set of attribute that may be requested 
+            according to this predicate """
+    def __mayRequestOne(self, attributes, rule):
+        attr_set = []
+        for attr in attributes:
+            if attr.startswith("r_"):
+                sub_rule = rule[attr]
+                res = frozenset(self.__process_rule(sub_rule))
+                if not len(res) == 0:
+                    attr_set.append(res)
+            else:
+                attr_set.append(attr)
+        print("The service may request one of the following options. Which one is your preference?")
+        x = 0
+        for a in attr_set:
+            x += 1
+            print(f"{x}: {set(a)}")
+        i = int(input())
+        if i - 1 in range(len(attr_set)):
+            return set(attr_set[i - 1])
+        else:
+            return
+
+    """ Processes rule predicates of the type 'mayRequestN' and returns the set of attribute that may be requested 
+        according to this predicate """
+    def __mayRequestN(self, attributes, rule):
+        attr_set = set()
+        for attr in attributes:
+            if attr.startsWith("r_"):
+                sub_rule = rule[attr]
+                res = frozenset(self.__process_rule(sub_rule))
+                if not len(res) == 0:
+                    attr_set.add(res)
+            else:
+                attr_set.add(attr)
+        print("The service may optionally request one or more of the following options. Which options would you be "
+              "willing to disclose?")
+        print("0: None")
+        x = 0
+        for a in attr_set:
+            x += 1
+            print(f"{x}: {set(a)}")
+        options = input()
+        options = options.split()
+        permitted_attributes = set()
+        for o in options:
+            i = int(o)
+            if i == 0:
+                return set()
+            elif i - 1 in range(len(attr_set)):
+                permitted_attributes.update(set(attr_set[i - 1]))
+            else:
+                return
+        return permitted_attributes
+
     """ Util method to retrieve the value of a specific attribute from a credential """
     def __retrieve_attribute_value(self, args):
         comps = args.split(".")
@@ -383,8 +379,8 @@ class Wallet(Client):
         credential = json.loads(file.read())
         file.close()
         attribute = credential["credentialSubject"]
-        for i in range(len(comps)-1):
-            attribute = attribute[comps[i+1]]
+        for i in range(len(comps) - 1):
+            attribute = attribute[comps[i + 1]]
         return attribute
 
     """ Method to model the second part of the presentation exchange, i.e. the "classic" presentation exchange """
@@ -542,7 +538,9 @@ class Wallet(Client):
     def run(self):
         self.__mock_session_establishment(13374)
         self.__presentation_exchange()
+        time.sleep(2)
         self.__presentation_exchange()
+        time.sleep(2)
         self.__presentation_exchange()
 
 # """ Util method to find out where a statement in parentheses ends """
