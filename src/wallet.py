@@ -245,13 +245,111 @@ class Wallet(Client):
     def __evaluate_decision_model(self, dec_model):
         permitted_attributes = set()
         amount_rules = int(dec_model["amount_rules"])
+        if amount_rules == 1:
+            rule = dec_model["r_1"]
+            permitted_attributes.update(self.__process_rule(rule))
+            return permitted_attributes
+        operators = dec_model["operators"]
+        prev_operator = ""
+        selection = []
         for x in range(amount_rules):
             rule = dec_model[f"r_{x + 1}"]
-            permitted_attributes.update(self.__process_rule(rule))
+            attributes = self.__process_rule(rule)
+            if x in range(len(operators)):
+                if operators[x] == prev_operator:
+                    if operators[x] == "AND":
+                        permitted_attributes.update(attributes)
+                    elif len(attributes) > 0:
+                        selection.append(frozenset(attributes))
+                else:
+                    match prev_operator:
+                        case "XOR":
+                            if len(attributes) > 0:
+                                selection.append(frozenset(attributes))
+                            print("The service may request one of the following options. Which one is your "
+                                  "preference?")
+                            y = 0
+                            for a in selection:
+                                y += 1
+                                print(f"{y}: {set(a)}")
+                            i = int(input())
+                            choice = set(selection[i - 1])
+                            selection.clear()
+                            if operators[x] == "OR":
+                                selection.append(frozenset(choice))
+                            else:
+                                permitted_attributes.update(choice)
+                        case "OR":
+                            if len(attributes) > 0:
+                                selection.append(frozenset(attributes))
+                            print(
+                                "The service may optionally request one or more of the following options. Which "
+                                "options would you be willing to disclose?")
+                            print("0: None")
+                            y = 0
+                            for a in selection:
+                                y += 1
+                                print(f"{y}: {set(a)}")
+                            options = input()
+                            options = options.split()
+                            tmp = set()
+                            for i in range(len(selection) + 1):
+                                if i == 0 and i in options:
+                                    break
+                                elif i+1 in options:
+                                    tmp.update(set(selection[i+1]))
+                            selection.clear()
+                            if operators[x] == "AND":
+                                permitted_attributes.update(tmp)
+                            else:
+                                selection.append(frozenset(tmp))
+                        case "AND":
+                            if len(attributes) > 0:
+                                selection.append(frozenset(attributes))
+                        case "":
+                            if operators[x] == "AND":
+                                permitted_attributes.update(attributes)
+                            elif len(attributes) > 0:
+                                selection.append(frozenset(attributes))
+                    prev_operator = operators[x]
+            else:
+                match prev_operator:
+                    case "AND":
+                        permitted_attributes.update(attributes)
+                    case "XOR":
+                        if len(attributes) > 0:
+                            selection.append(frozenset(attributes))
+                        print("The service may request one of the following options. Which one is your "
+                              "preference?")
+                        y = 0
+                        for a in selection:
+                            y += 1
+                            print(f"{y}: {set(a)}")
+                        i = int(input())
+                        permitted_attributes.update(set(selection[i - 1]))
+                        selection.clear()
+                    case "OR":
+                        if len(attributes) > 0:
+                            selection.append(frozenset(attributes))
+                        print("The service may optionally request one or more of the following options. Which options "
+                              "would you be willing to disclose?")
+                        print("0: None")
+                        x = 0
+                        for a in selection:
+                            x += 1
+                            print(f"{x}: {set(a)}")
+                        options = input()
+                        options = options.split()
+                        permitted_attributes = set()
+                        for o in options:
+                            i = int(o)
+                            if i == 0:
+                                break
+                            elif i - 1 in range(len(selection)):
+                                permitted_attributes.update(set(selection[i - 1]))
         return permitted_attributes
 
     """ Util method to process a rule predicate """
-
     def __process_rule(self, rule):
         condition = rule["condition"]
         if not self.__process_condition(condition):
@@ -263,14 +361,15 @@ class Wallet(Client):
         match predicate:
             case "mayRequest":
                 return access["attributes"]
-            case "mayRequestOne":
-               return self.__mayRequestOne(access["attributes"], rule)
-            case "mayRequestN":
-               return self.__mayRequestN(access["attributes"], rule)
+            # case "mayRequestOne":
+            #   return self.__mayRequestOne(access["attributes"], rule)
+            # case "mayRequestN":
+            #   return self.__mayRequestN(access["attributes"], rule)
             case _:
                 return []
 
     """ Util method to evaluate the condition of a specific rule predicate """
+
     def __process_condition(self, condition):
         result = False
         amount = condition["amount"]
@@ -301,6 +400,7 @@ class Wallet(Client):
         return result
 
     """Processes a condition predicate and returns the result"""
+
     def __process_condition_predicate(self, predicate, parameters):
         match predicate:
             case "equals":
@@ -318,60 +418,61 @@ class Wallet(Client):
 
     """ Processes rule predicates of the type 'mayRequestOne' and returns the set of attribute that may be requested 
             according to this predicate """
-    def __mayRequestOne(self, attributes, rule):
-        attr_set = []
-        for attr in attributes:
-            if attr.startswith("r_"):
-                sub_rule = rule[attr]
-                res = frozenset(self.__process_rule(sub_rule))
-                if not len(res) == 0:
-                    attr_set.append(res)
-            else:
-                attr_set.append(attr)
-        print("The service may request one of the following options. Which one is your preference?")
-        x = 0
-        for a in attr_set:
-            x += 1
-            print(f"{x}: {set(a)}")
-        i = int(input())
-        if i - 1 in range(len(attr_set)):
-            return set(attr_set[i - 1])
-        else:
-            return
+    # def __mayRequestOne(self, attributes, rule):
+    #    attr_set = []
+    #    for attr in attributes:
+    #        if attr.startswith("r_"):
+    #            sub_rule = rule[attr]
+    #            res = frozenset(self.__process_rule(sub_rule))
+    #            if not len(res) == 0:
+    #                attr_set.append(res)
+    #        else:
+    #            attr_set.append(attr)
+    #    print("The service may request one of the following options. Which one is your preference?")
+    #    x = 0
+    #    for a in attr_set:
+    #        x += 1
+    #        print(f"{x}: {set(a)}")
+    #    i = int(input())
+    #    if i - 1 in range(len(attr_set)):
+    #        return set(attr_set[i - 1])
+    #    else:
+    #        return
 
     """ Processes rule predicates of the type 'mayRequestN' and returns the set of attribute that may be requested 
         according to this predicate """
-    def __mayRequestN(self, attributes, rule):
-        attr_set = set()
-        for attr in attributes:
-            if attr.startsWith("r_"):
-                sub_rule = rule[attr]
-                res = frozenset(self.__process_rule(sub_rule))
-                if not len(res) == 0:
-                    attr_set.add(res)
-            else:
-                attr_set.add(attr)
-        print("The service may optionally request one or more of the following options. Which options would you be "
-              "willing to disclose?")
-        print("0: None")
-        x = 0
-        for a in attr_set:
-            x += 1
-            print(f"{x}: {set(a)}")
-        options = input()
-        options = options.split()
-        permitted_attributes = set()
-        for o in options:
-            i = int(o)
-            if i == 0:
-                return set()
-            elif i - 1 in range(len(attr_set)):
-                permitted_attributes.update(set(attr_set[i - 1]))
-            else:
-                return
-        return permitted_attributes
+    # def __mayRequestN(self, attributes, rule):
+    #    attr_set = set()
+    #    for attr in attributes:
+    #        if attr.startsWith("r_"):
+    #            sub_rule = rule[attr]
+    #            res = frozenset(self.__process_rule(sub_rule))
+    #            if not len(res) == 0:
+    #                attr_set.add(res)
+    #        else:
+    #            attr_set.add(attr)
+    #    print("The service may optionally request one or more of the following options. Which options would you be "
+    #          "willing to disclose?")
+    #    print("0: None")
+    #    x = 0
+    #    for a in attr_set:
+    #        x += 1
+    #        print(f"{x}: {set(a)}")
+    #    options = input()
+    #    options = options.split()
+    #    permitted_attributes = set()
+    #    for o in options:
+    #        i = int(o)
+    #        if i == 0:
+    #            return set()
+    #        elif i - 1 in range(len(attr_set)):
+    #            permitted_attributes.update(set(attr_set[i - 1]))
+    #        else:
+    #            return []
+    #    return permitted_attributes
 
     """ Util method to retrieve the value of a specific attribute from a credential """
+
     def __retrieve_attribute_value(self, args):
         comps = args.split(".")
         credential_type = comps[0]
