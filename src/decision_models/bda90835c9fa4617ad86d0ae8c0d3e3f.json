@@ -1,63 +1,54 @@
 {
 	"contextID": "bda90835c9fa4617ad86d0ae8c0d3e3f",
-	"amount_rules": 1,
-	"r_1": {
+	"amount_rules": 3,
+    "operators": ["XOR","XOR"],
+    "r_1": {
       "condition": {
-        "amount": 0
+        "amount": 1,
+        "c_1": {
+          "predicate": "lessThanOrEquals",
+          "parameters": ["PensionCredential.amount", 10000]
+        }
       },
       "access_permissions": {
-        "predicate": "mayRequestOne",
+        "predicate": "mayRequest",
         "verifier": "v",
-        "attributes": ["r_1_1", "r_1_2", "r_1_3"]
-      },
-      "r_1_1": {
-        "condition": {
-          "amount": 1,
-          "c_1": {
-            "predicate": "lessThanOrEquals",
-            "parameters": ["PensionCredential.amount", 10000]
-          }
-        },
-        "access_permissions": {
-          "predicate": "mayRequest",
-          "verifier": "v",
-          "attributes": ["PensionCredential.amount"]
+        "attributes": ["PensionCredential.amount"]
+      }
+    },
+    "r_2": {
+      "condition": {
+        "amount": 1,
+        "c_1": {
+          "predicate": "greaterThanOrEquals",
+          "parameters": ["MedicalFileCredential.amountLostAbilities", 2]
         }
       },
-      "r_1_2": {
-        "condition": {
-          "amount": 1,
-          "c_1": {
-            "predicate": "greaterThanOrEquals",
-            "parameters": ["MedicalFileCredential.amountLostAbilities", 2]
-          }
+      "access_permissions": {
+        "predicate": "mayRequest",
+        "verifier": "v",
+        "attributes": [
+          "MedicalFileCredential.amountLostAbilities"
+        ]
+      }
+    },
+    "r_3": {
+      "condition": {
+        "amount": 2,
+        "c_1": {
+          "predicate": "lessThan",
+          "parameters": ["PensionCredential.amount",30000]
         },
-        "access_permissions": {
-          "predicate": "mayRequest",
-          "verifier": "v",
-          "attributes": [
-            "MedicalFileCredential.amountLostAbilities"
-          ]
-        }
+        "c_2": {
+          "predicate": "greaterThan",
+          "parameters": ["IDCardCredential.age",80]
+        },
+        "operators": ["AND"]
       },
-      "r_1_3": {
-        "condition": {
-          "amount": 2,
-          "c_1": {
-            "predicate": "lessThan",
-            "parameters": ["PensionCredential.amount",30000]
-          },
-          "c_2": {
-            "predicate": "greaterThan",
-            "parameters": ["IDCardCredential.age",80]
-          },
-          "operators": ["AND"]
-        },
-        "access_permissions": {
-          "predicate": "mayRequest",
-          "verifier": "v",
-          "attributes": ["PensionCredential.amount","IDCardCredential.age"]
-        }
+      "access_permissions": {
+        "predicate": "mayRequest",
+        "verifier": "v",
+        "attributes": ["PensionCredential.amount","IDCardCredential.age"]
       }
     }
 }
